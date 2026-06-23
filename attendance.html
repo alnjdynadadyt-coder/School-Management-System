@@ -28,11 +28,11 @@
         <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
     </select>
     <select id="fSection"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
-    <button onclick="loadStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none; border-radius:5px;">جلب قائمة الطلاب</button>
+    <button onclick="loadStudentsForAttendance()" style="width:100%; padding:10px; background:#007bff; color:white; border:none; border-radius:5px;">جلب قائمة الطلاب</button>
 </div>
 
-<div class="card" id="list">
-    <p style="text-align:center;">اختر الصف والشعبة واضغط جلب القائمة</p>
+<div class="card" id="attendanceList">
+    <p style="text-align:center;">اختر الصف والشعبة واضغط "جلب قائمة الطلاب"</p>
 </div>
 
 <button onclick="saveAttendance()" style="width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:5px; font-size:18px;">💾 حفظ الحضور</button>
@@ -58,12 +58,12 @@
         else { btn.className = 'btn-status present'; btn.innerText = 'حاضر'; }
     };
 
-    window.loadStudents = async () => {
+    window.loadStudentsForAttendance = async () => {
         const c = document.getElementById('fClass').value;
         const s = document.getElementById('fSection').value;
         const q = query(collection(db, "students"), where("class", "==", c), where("section", "==", s));
         const snap = await getDocs(q);
-        const list = document.getElementById('list');
+        const list = document.getElementById('attendanceList');
         list.innerHTML = "";
         snap.forEach(d => {
             const dt = d.data();
@@ -78,12 +78,15 @@
         const rows = document.querySelectorAll('.student-row');
         const lesson = document.getElementById('lesson').value;
         const subject = document.getElementById('subject').value;
+        const className = document.getElementById('fClass').value;
+        
         rows.forEach(async (row) => {
             await addDoc(collection(db, "attendance"), {
                 name: row.children[0].innerText,
                 status: row.children[1].innerText,
                 lesson: lesson,
                 subject: subject,
+                class: className,
                 date: new Date().toLocaleDateString('ar-IQ')
             });
         });

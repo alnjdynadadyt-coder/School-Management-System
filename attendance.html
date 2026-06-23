@@ -2,40 +2,71 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الحضور اليومي</title>
+    <title>تسجيل الحضور</title>
     <style>
-        .student-row { padding: 15px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }
-        .status-btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; }
-        .present { background: #d4edda; color: #155724; } /* حاضر */
-        .absent { background: #f8d7da; color: #721c24; } /* غائب */
-        .excused { background: #fff3cd; color: #856404; } /* مجاز */
+        body { font-family: sans-serif; padding: 15px; background: #f4f7f6; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
+        .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
+        .status-btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        .present { background: #d4edda; color: #155724; }
+        .absent { background: #f8d7da; color: #721c24; }
+        .excused { background: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>تسجيل حضور الدرس</h3>
-    <select id="lesson">
-        <option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option>
-        <option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option>
+    <h3>تسجيل الحضور</h3>
+    <select id="fClass">
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
     </select>
-    <input type="text" id="subject" placeholder="اسم المادة">
-    <button onclick="loadStudentsForAttendance()">عرض الطلاب</button>
+    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option></select>
+    <button onclick="loadStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none;">جلب قائمة الطلاب</button>
 </div>
 
-<div id="attendanceList"></div>
+<div class="card" id="list"></div>
+<button onclick="saveAttendance()" style="width:100%; padding:15px; background:#28a745; color:white; border:none;">💾 حفظ الحضور اليومي</button>
 
-<script>
-    // سنقوم هنا ببرمجة دالة تغيير الحالة عند النقر
-    function toggleStatus(btn) {
-        if (btn.classList.contains('present')) {
-            btn.className = 'status-btn absent'; btn.innerText = 'غائب';
-        } else if (btn.classList.contains('absent')) {
-            btn.className = 'status-btn excused'; btn.innerText = 'مجاز';
-        } else {
-            btn.className = 'status-btn present'; btn.innerText = 'حاضر';
-        }
-    }
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, addDoc, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const db = getFirestore(initializeApp({ /* بياناتك هنا */ }));
+
+    window.toggleStatus = (btn) => {
+        if (btn.classList.contains('present')) { btn.className = 'status-btn absent'; btn.innerText = 'غائب'; }
+        else if (btn.classList.contains('absent')) { btn.className = 'status-btn excused'; btn.innerText = 'مجاز'; }
+        else { btn.className = 'status-btn present'; btn.innerText = 'حاضر'; }
+    };
+
+    window.loadStudents = async () => {
+        const c = document.getElementById('fClass').value;
+        const s = document.getElementById('fSection').value;
+        const q = query(collection(db, "students"), where("class", "==", c), where("section", "==", s));
+        const snap = await getDocs(q);
+        const list = document.getElementById('list');
+        list.innerHTML = "";
+        snap.forEach(d => {
+            const dt = d.data();
+            list.innerHTML += `<div class="row">
+                <span>${dt.name}</span>
+                <button class="status-btn present" onclick="toggleStatus(this)">حاضر</button>
+            </div>`;
+        });
+    };
+
+    window.saveAttendance = async () => {
+        const rows = document.querySelectorAll('.row');
+        rows.forEach(async (row) => {
+            await addDoc(collection(db, "attendance"), {
+                name: row.children[0].innerText,
+                status: row.children[1].innerText,
+                date: new Date().toLocaleDateString('ar-IQ'),
+                class: document.getElementById('fClass').value
+            });
+        });
+        alert("تم حفظ الحضور بنجاح!");
+    };
 </script>
 </body>
 </html>

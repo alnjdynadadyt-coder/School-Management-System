@@ -2,15 +2,14 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير الإداري المتطور</title>
+    <title>التقرير الإداري</title>
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f8f9fa; }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .grid-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .grid-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background: #007bff; color: white; }
-        .btn-export { padding: 10px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: white; }
     </style>
 </head>
 <body>
@@ -20,8 +19,15 @@
     <div class="grid-filters">
         <input type="date" id="start">
         <input type="date" id="end">
-        <select id="fClass"><option value="">المرحلة</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
-        <select id="fSection"><option value="">الشعبة</option><option>أ</option><option>ب</option><option>ج</option></select>
+        <select id="fClass">
+            <option value="">كل المراحل</option>
+            <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+            <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
+        </select>
+        <select id="fSection">
+            <option value="">كل الشعب</option>
+            <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option>
+        </select>
     </div>
     <button onclick="generateReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; margin-top:10px;">📊 استخراج التقرير</button>
 </div>
@@ -29,9 +35,6 @@
 <div class="card" id="reportArea"></div>
 
 <div style="text-align:center;">
-    <button class="btn-export" style="background:#dc3545;" onclick="alert('تنبيه: ميزة PDF قيد التطوير')">تحميل PDF</button>
-    <button class="btn-export" style="background:#218838;" onclick="alert('تنبيه: ميزة Excel قيد التطوير')">تحميل Excel</button>
-    <br><br>
     <a href="index.html">⬅️ العودة للرئيسية</a>
 </div>
 
@@ -57,8 +60,12 @@
 
         snap.forEach(d => {
             const dt = d.data();
-            // تصفية حسب الصف والشعبة والغياب فقط
-            if((!sClass || dt.class === sClass) && dt.status !== "حاضر") {
+            
+            // تحقق من المطابقة: إذا لم يختر المستخدم قيمة، نعتبر الفلتر مفتوحاً (الكل)
+            const classMatch = (sClass === "" || dt.class === sClass);
+            const sectionMatch = (sSection === "" || dt.section === sSection);
+
+            if(classMatch && sectionMatch && dt.status !== "حاضر") {
                 if(!reportData[dt.name]) {
                     reportData[dt.name] = { count: 0, details: [] };
                 }

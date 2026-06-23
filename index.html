@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة المدرسة - لوحة التحكم</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; text-align: center; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        button { padding: 15px 25px; margin: 10px; border: none; border-radius: 5px; background: #007bff; color: white; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>مرحباً بك في نظام الإدارة الرقمي</h1>
+    <div class="card">
+        <h3>البرامج المتاحة</h3>
+        <button onclick="alert('جارٍ تجهيز برنامج الطلاب')">إدارة الطلاب</button>
+        <button onclick="alert('جارٍ تجهيز برنامج الحضور')">تسجيل الحضور</button>
+        <button onclick="alert('جارٍ تجهيز الأرشيف')">الأرشيف الرقمي</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+            authDomain: "school-manager-d1865.firebaseapp.com",
+            projectId: "school-manager-d1865",
+            storageBucket: "school-manager-d1865.firebasestorage.app",
+            messagingSenderId: "752295259069",
+            appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        console.log("تم الربط بنجاح مع قاعدة بيانات المدرسة!");
+    </script>
+</body>
+</html>

@@ -2,13 +2,15 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب</title>
+    <title>إدارة الطلاب المتقدمة</title>
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f4f7f6; }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input, select { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        button { width: 100%; padding: 12px; margin: 5px 0; border: none; border-radius: 5px; cursor: pointer; color: white; background: #007bff; font-weight: bold; }
-        .back-link { display: block; text-align: center; margin-top: 10px; color: #555; text-decoration: none; }
+        input, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { padding: 10px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; color: white; }
+        .btn-del { background: #dc3545; }
+        .btn-edit { background: #ffc107; color: black; }
+        .student-row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
     </style>
 </head>
 <body>
@@ -16,56 +18,62 @@
 <div class="card">
     <h3>إضافة طالب جديد</h3>
     <input type="text" id="name" placeholder="اسم الطالب">
-    <button onclick="startDictation()" style="background: #28a745;">🎤 إدخال الاسم بالصوت</button>
-    <input type="text" id="idNum" placeholder="رقم القيد">
-    <input type="text" id="birth" placeholder="سنة التولد">
-    <select id="class">
-        <option>الرابع العلمي</option><option>الخامس العلمي</option>
-        <option>الرابع الأدبي</option><option>الخامس الأدبي</option>
-        <option>السادس الأدبي</option><option>السادس العلمي</option>
-    </select>
-    <select id="section">
-        <option>أ</option><option>ب</option><option>ج</option><option>د</option>
-    </select>
-    <button onclick="saveStudent()">💾 حفظ الطالب</button>
+    <button onclick="startDictation()" style="background: #28a745;">🎤 صوت</button>
+    <button onclick="saveStudent()" style="background: #007bff; width: 100%;">💾 حفظ الطالب</button>
 </div>
 
-<a href="index.html" class="back-link">⬅️ العودة للرئيسية</a>
+<div class="card">
+    <h3>قائمة الطلاب (فلترة)</h3>
+    <select id="fClass" onchange="loadStudents()">
+        <option value="">كل الصفوف</option>
+        <option>الرابع العلمي</option><option>السادس العلمي</option>
+    </select>
+    <select id="fSection" onchange="loadStudents()">
+        <option value="">كل الشعب</option>
+        <option>أ</option><option>ب</option><option>ج</option>
+    </select>
+    <div id="list"></div>
+</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        authDomain: "school-manager-d1865.firebaseapp.com",
-        projectId: "school-manager-d1865",
-        storageBucket: "school-manager-d1865.firebasestorage.app",
-        messagingSenderId: "752295259069",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    };
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    window.startDictation = () => {
-        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        rec.lang = 'ar-IQ';
-        rec.start();
-        rec.onresult = (e) => { document.getElementById('name').value = e.results[0][0].transcript; };
-    };
+    const db = getFirestore(initializeApp({ /* بياناتك هنا */ }));
 
     window.saveStudent = async () => {
-        try {
-            await addDoc(collection(db, "students"), {
-                name: document.getElementById('name').value,
-                id: document.getElementById('idNum').value,
-                birth: document.getElementById('birth').value,
-                class: document.getElementById('class').value,
-                section: document.getElementById('section').value
-            });
-            alert("تم حفظ الطالب بنجاح!");
-        } catch (e) { alert("خطأ في الحفظ: " + e.message); }
+        await addDoc(collection(db, "students"), {
+            name: document.getElementById('name').value,
+            class: document.getElementById('class').value,
+            section: document.getElementById('section').value
+        });
+        loadStudents();
     };
+
+    window.deleteStudent = async (id) => {
+        if(confirm("هل أنت متأكد؟")) {
+            await deleteDoc(doc(db, "students", id));
+            loadStudents();
+        }
+    };
+
+    window.loadStudents = async () => {
+        const snap = await getDocs(collection(db, "students"));
+        const list = document.getElementById('list');
+        list.innerHTML = "";
+        snap.forEach(d => {
+            const data = d.data();
+            list.innerHTML += `
+                <div class="student-row">
+                    <span>${data.name} (${data.class} - ${data.section})</span>
+                    <div>
+                        <button class="btn-edit">تعديل</button>
+                        <button class="btn-del" onclick="deleteStudent('${d.id}')">حذف</button>
+                    </div>
+                </div>`;
+        });
+    };
+    loadStudents(); // تحميل عند فتح الصفحة
 </script>
 </body>
 </html>

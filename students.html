@@ -1,52 +1,33 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>إدارة الطلاب</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; text-align: center; }
-        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
-        button { padding: 15px 30px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; color: white; }
-    </style>
-</head>
-<body>
-    <h1>إضافة طالب جديد</h1>
-    <input type="text" id="studentName" placeholder="اسم الطالب (يمكنك استخدام الميكروفون)">
-    <input type="text" id="studentId" placeholder="رقم القيد">
-    <br>
-    <button onclick="startDictation()" style="background:#28a745;">🎤 إدخال الاسم بالصوت</button>
-    <button onclick="saveStudent()" style="background:#007bff;">💾 حفظ الطالب</button>
-    <br><br>
-    <a href="index.html">⬅️ العودة للرئيسية</a>
+<select id="filterClass">
+    <option value="">اختر الصف</option>
+    <option value="الرابع العلمي">الرابع العلمي</option>
+    <option value="الخامس العلمي">الخامس العلمي</option>
+</select>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+<select id="filterSection">
+    <option value="">اختر الشعبة</option>
+    <option value="أ">أ</option>
+    <option value="ب">ب</option>
+</select>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-            authDomain: "school-manager-d1865.firebaseapp.com",
-            projectId: "school-manager-d1865",
-            storageBucket: "school-manager-d1865.firebasestorage.app",
-            messagingSenderId: "752295259069",
-            appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+<div id="studentList"></div>
 
-        window.startDictation = () => {
-            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = 'ar-IQ';
-            recognition.start();
-            recognition.onresult = (e) => { document.getElementById('studentName').value = e.results[0][0].transcript; };
-        };
-
-        window.saveStudent = async () => {
-            const name = document.getElementById('studentName').value;
-            const id = document.getElementById('studentId').value;
-            await addDoc(collection(db, "students"), { name: name, id: id, date: new Date() });
-            alert("تم حفظ الطالب بنجاح!");
-        };
-    </script>
-</body>
-</html>
+<script type="module">
+    // عند تغيير الصف أو الشعبة، سنقوم بجلب البيانات بهذه الطريقة:
+    import { query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    
+    // دالة جلب البيانات بناءً على الفلترة
+    window.fetchFilteredStudents = async () => {
+        const selectedClass = document.getElementById('filterClass').value;
+        const selectedSection = document.getElementById('filterSection').value;
+        
+        let q = collection(db, "students");
+        
+        // هنا المنطق الذكي: إذا اخترت الصف فقط، يجلب الكل. إذا اخترت الشعبة، يحدد البحث.
+        if(selectedClass) q = query(q, where("class", "==", selectedClass));
+        if(selectedSection) q = query(q, where("section", "==", selectedSection));
+        
+        const querySnapshot = await getDocs(q);
+        // عرض النتائج في #studentList
+    }
+</script>

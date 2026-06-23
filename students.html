@@ -1,33 +1,71 @@
-<select id="filterClass">
-    <option value="">اختر الصف</option>
-    <option value="الرابع العلمي">الرابع العلمي</option>
-    <option value="الخامس العلمي">الخامس العلمي</option>
-</select>
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>نظام إدارة الطلاب الذكي</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; text-align: center; }
+        .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 5px; cursor: pointer; color: white; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>إضافة طالب جديد</h1>
+        <input type="text" id="name" placeholder="اسم الطالب (أو استخدم الصوت 🎤)">
+        <input type="text" id="idNum" placeholder="رقم القيد">
+        <input type="text" id="birth" placeholder="تاريخ التولد">
+        <select id="class"><option>الرابع العلمي</option><option>الخامس العلمي</option></select>
+        <select id="section"><option>أ</option><option>ب</option><option>ج</option></select>
+        <button onclick="saveStudent()" style="background:#007bff; width: 100%;">حفظ الطالب</button>
+    </div>
 
-<select id="filterSection">
-    <option value="">اختر الشعبة</option>
-    <option value="أ">أ</option>
-    <option value="ب">ب</option>
-</select>
+    <div class="card">
+        <h3>قائمة الطلاب (فلترة ذكية)</h3>
+        <select id="filterClass" onchange="loadStudents()">
+            <option value="">كل الصفوف</option>
+            <option value="الرابع العلمي">الرابع العلمي</option>
+        </select>
+        <select id="filterSection" onchange="loadStudents()">
+            <option value="">كل الشعب</option>
+            <option value="أ">أ</option>
+            <option value="ب">ب</option>
+        </select>
+        <div id="list" style="margin-top: 15px; text-align: right;"></div>
+    </div>
 
-<div id="studentList"></div>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-<script type="module">
-    // عند تغيير الصف أو الشعبة، سنقوم بجلب البيانات بهذه الطريقة:
-    import { query, where, getDocs, collection } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    
-    // دالة جلب البيانات بناءً على الفلترة
-    window.fetchFilteredStudents = async () => {
-        const selectedClass = document.getElementById('filterClass').value;
-        const selectedSection = document.getElementById('filterSection').value;
-        
-        let q = collection(db, "students");
-        
-        // هنا المنطق الذكي: إذا اخترت الصف فقط، يجلب الكل. إذا اخترت الشعبة، يحدد البحث.
-        if(selectedClass) q = query(q, where("class", "==", selectedClass));
-        if(selectedSection) q = query(q, where("section", "==", selectedSection));
-        
-        const querySnapshot = await getDocs(q);
-        // عرض النتائج في #studentList
-    }
-</script>
+        const firebaseConfig = { /* (نفس بياناتك السابقة) */ };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.saveStudent = async () => {
+            await addDoc(collection(db, "students"), {
+                name: document.getElementById('name').value,
+                class: document.getElementById('class').value,
+                section: document.getElementById('section').value
+            });
+            alert("تم الحفظ!"); loadStudents();
+        };
+
+        window.loadStudents = async () => {
+            const c = document.getElementById('filterClass').value;
+            const s = document.getElementById('filterSection').value;
+            let q = collection(db, "students");
+            if(c) q = query(q, where("class", "==", c));
+            
+            const snap = await getDocs(q);
+            document.getElementById('list').innerHTML = "";
+            snap.forEach(doc => {
+                const d = doc.data();
+                if(!s || d.section == s)
+                    document.getElementById('list').innerHTML += `<p>🎓 ${d.name} - ${d.class} (${d.section})</p>`;
+            });
+        };
+    </script>
+</body>
+</html>

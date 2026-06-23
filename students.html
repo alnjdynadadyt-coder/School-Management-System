@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إدارة الطلاب</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; text-align: center; }
+        input { width: 90%; padding: 12px; margin: 10px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { padding: 15px 30px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>إضافة طالب جديد</h1>
+    <input type="text" id="studentName" placeholder="اسم الطالب (يمكنك استخدام الميكروفون)">
+    <input type="text" id="studentId" placeholder="رقم القيد">
+    <br>
+    <button onclick="startDictation()">🎤 إدخال الاسم بالصوت</button>
+    <button onclick="saveStudent()" style="background:#007bff;">💾 حفظ الطالب</button>
+    <br><br>
+    <a href="index.html">⬅️ العودة للرئيسية</a>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+            authDomain: "school-manager-d1865.firebaseapp.com",
+            projectId: "school-manager-d1865",
+            storageBucket: "school-manager-d1865.firebasestorage.app",
+            messagingSenderId: "752295259069",
+            appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        window.startDictation = () => {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'ar-IQ';
+            recognition.start();
+            recognition.onresult = (e) => { document.getElementById('studentName').value = e.results[0][0].transcript; };
+        };
+
+        window.saveStudent = async () => {
+            const name = document.getElementById('studentName').value;
+            const id = document.getElementById('studentId').value;
+            await addDoc(collection(db, "students"), { name: name, id: id, date: new Date() });
+            alert("تم حفظ الطالب بنجاح!");
+        };
+    </script>
+</body>
+</html>

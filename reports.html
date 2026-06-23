@@ -2,33 +2,32 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تقرير الحضور اليومي</title>
+    <title>التقرير الإداري الذكي</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        body { font-family: sans-serif; padding: 15px; background: #f8f9fa; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .filter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: center; }
         th { background: #007bff; color: white; }
+        .status-absent { color: red; font-weight: bold; }
+        .status-excused { color: orange; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>تقرير الحضور والغياب</h3>
-    <input type="date" id="datePicker">
-    <select id="fClass">
-        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-        <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
-    </select>
-    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option></select>
-    <button onclick="showReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; border-radius:5px; margin-top:10px;">📊 عرض التقرير</button>
+    <h3>فلتر التقرير الذكي</h3>
+    <div class="filter-group">
+        <input type="date" id="start" title="من تاريخ">
+        <input type="date" id="end" title="إلى تاريخ">
+        <select id="fClass"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>السادس العلمي</option></select>
+        <input type="text" id="studentName" placeholder="بحث باسم الطالب...">
+    </div>
+    <button onclick="generateReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; border-radius:5px; margin-top:10px;">📊 استخراج التقرير</button>
 </div>
 
-<div class="card" id="reportArea">
-    <p style="text-align:center;">اختر التاريخ والصف لعرض النتائج</p>
-</div>
-
-<a href="index.html" style="display:block; text-align:center; margin-top:20px;">⬅️ العودة للرئيسية</a>
+<div class="card" id="reportArea"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -43,28 +42,27 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    window.showReport = async () => {
-        const dateVal = document.getElementById('datePicker').value;
-        const selectedClass = document.getElementById('fClass').value;
-        const selectedSection = document.getElementById('fSection').value;
-        
-        // تحويل التاريخ من صيغة HTML (YYYY-MM-DD) إلى صيغة مطابقة لما حفظناه
-        const formattedDate = new Date(dateVal).toLocaleDateString('ar-IQ');
-        
+    window.generateReport = async () => {
         const snap = await getDocs(collection(db, "attendance"));
-        let html = `<table><tr><th>الطالب</th><th>المادة</th><th>الدرس</th><th>الحالة</th></tr>`;
-        let found = false;
-
+        const nameFilter = document.getElementById('studentName').value;
+        const classFilter = document.getElementById('fClass').value;
+        
+        let html = `<table><tr><th>التاريخ</th><th>الطالب</th><th>الحالة</th><th>المادة</th></tr>`;
+        
         snap.forEach(d => {
             const dt = d.data();
-            if(dt.date == formattedDate && dt.class == selectedClass) {
-                html += `<tr><td>${dt.name}</td><td>${dt.subject}</td><td>${dt.lesson}</td><td>${dt.status}</td></tr>`;
-                found = true;
+            // فلترة ذكية: إظهار الغياب والمجازين فقط
+            if(dt.status !== "حاضر") {
+                if((!nameFilter || dt.name.includes(nameFilter)) && (!classFilter || dt.class === classFilter)) {
+                    const statusClass = dt.status === "غائب" ? "status-absent" : "status-excused";
+                    html += `<tr><td>${dt.date}</td><td>${dt.name}</td><td class="${statusClass}">${dt.status}</td><td>${dt.subject}</td></tr>`;
+                }
             }
         });
         
         html += `</table>`;
-        document.getElementById('reportArea').innerHTML = found ? html : "<p style='text-align:center;'>لا توجد بيانات مسجلة لهذا التاريخ والصف</p>";
+        document.getElementById('reportArea').innerHTML = html;
+        window.print(); // تفعيل التصدير للطباعة مباشرة
     };
 </script>
 </body>

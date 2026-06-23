@@ -2,67 +2,70 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير الإداري الذكي</title>
+    <title>التقرير الإداري المتطور</title>
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f8f9fa; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .filter-group { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .grid-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th, td { border: 1px solid #dee2e6; padding: 10px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background: #007bff; color: white; }
-        .status-absent { color: red; font-weight: bold; }
-        .status-excused { color: orange; font-weight: bold; }
+        .btn-export { padding: 10px; margin: 5px; cursor: pointer; border: none; border-radius: 5px; color: white; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <h3>فلتر التقرير الذكي</h3>
-    <div class="filter-group">
-        <input type="date" id="start" title="من تاريخ">
-        <input type="date" id="end" title="إلى تاريخ">
-        <select id="fClass"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>السادس العلمي</option></select>
-        <input type="text" id="studentName" placeholder="بحث باسم الطالب...">
+    <div class="grid-filters">
+        <input type="date" id="start">
+        <input type="date" id="end">
+        <select id="fClass"><option value="">المرحلة</option><option>الرابع العلمي</option><option>السادس العلمي</option></select>
+        <select id="fSection"><option value="">الشعبة</option><option>أ</option><option>ب</option></select>
     </div>
-    <button onclick="generateReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; border-radius:5px; margin-top:10px;">📊 استخراج التقرير</button>
+    <button onclick="generateReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; margin-top:10px;">📊 استخراج التقرير</button>
 </div>
 
 <div class="card" id="reportArea"></div>
+
+<div style="text-align:center;">
+    <button class="btn-export" style="background:#dc3545;" onclick="alert('جارٍ تجهيز ملف PDF...')">تحميل PDF</button>
+    <button class="btn-export" style="background:#218838;" onclick="alert('جارٍ تجهيز ملف Excel...')">تحميل Excel</button>
+    <br><br>
+    <a href="index.html">⬅️ العودة للرئيسية</a>
+</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        authDomain: "school-manager-d1865.firebaseapp.com",
-        projectId: "school-manager-d1865",
-        storageBucket: "school-manager-d1865.firebasestorage.app",
-        messagingSenderId: "752295259069",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
+    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
 
     window.generateReport = async () => {
         const snap = await getDocs(collection(db, "attendance"));
-        const nameFilter = document.getElementById('studentName').value;
-        const classFilter = document.getElementById('fClass').value;
+        const sClass = document.getElementById('fClass').value;
+        const sSection = document.getElementById('fSection').value;
         
-        let html = `<table><tr><th>التاريخ</th><th>الطالب</th><th>الحالة</th><th>المادة</th></tr>`;
-        
+        let reportData = {}; // لتجميع غيابات كل طالب
+
         snap.forEach(d => {
             const dt = d.data();
-            // فلترة ذكية: إظهار الغياب والمجازين فقط
-            if(dt.status !== "حاضر") {
-                if((!nameFilter || dt.name.includes(nameFilter)) && (!classFilter || dt.class === classFilter)) {
-                    const statusClass = dt.status === "غائب" ? "status-absent" : "status-excused";
-                    html += `<tr><td>${dt.date}</td><td>${dt.name}</td><td class="${statusClass}">${dt.status}</td><td>${dt.subject}</td></tr>`;
+            // تصفية حسب الصف والشعبة
+            if((!sClass || dt.class === sClass) && dt.status !== "حاضر") {
+                if(!reportData[dt.name]) {
+                    reportData[dt.name] = { count: 0, details: [] };
                 }
+                reportData[dt.name].count++;
+                reportData[dt.name].details.push(`${dt.lesson} (${dt.status})`);
             }
         });
-        
+
+        let html = `<table><tr><th>اسم الطالب</th><th>عدد الدروس الغائب عنها</th><th>التفاصيل</th></tr>`;
+        for (let name in reportData) {
+            html += `<tr><td>${name}</td><td>${reportData[name].count}</td><td>${reportData[name].details.join('، ')}</td></tr>`;
+        }
         html += `</table>`;
         document.getElementById('reportArea').innerHTML = html;
-        window.print(); // تفعيل التصدير للطباعة مباشرة
     };
 </script>
 </body>

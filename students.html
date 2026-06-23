@@ -2,15 +2,13 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب الشاملة</title>
+    <title>إدارة الطلاب</title>
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f4f7f6; }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        input, select { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
+        input, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
         button { padding: 10px; margin: 5px 0; border: none; border-radius: 5px; cursor: pointer; color: white; width: 100%; }
-        .btn-save { background: #007bff; }
-        .btn-voice { background: #28a745; }
-        .student-row { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding: 8px 0; font-size: 14px; }
+        .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 8px 0; }
     </style>
 </head>
 <body>
@@ -18,64 +16,66 @@
 <div class="card">
     <h3>إضافة طالب جديد</h3>
     <input type="text" id="name" placeholder="اسم الطالب">
-    <button class="btn-voice" onclick="startDictation()">🎤 إدخال بالصوت</button>
+    <button onclick="startDictation()" style="background:#28a745;">🎤 صوت</button>
     <input type="text" id="idNum" placeholder="رقم القيد">
     <select id="birthYear"></select>
-    <select id="class"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
+    <select id="class">
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
+    </select>
     <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option></select>
-    <button class="btn-save" onclick="saveStudent()">💾 حفظ الطالب</button>
+    <button onclick="saveStudent()" style="background:#007bff;">💾 حفظ الطالب</button>
 </div>
 
 <div class="card">
-    <h3>قائمة الطلاب</h3>
+    <h3>فلترة وعرض الطلاب</h3>
+    <select id="fClass" onchange="loadStudents()">
+        <option value="">جميع الصفوف</option>
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
+    </select>
+    <select id="fSection" onchange="loadStudents()">
+        <option value="">جميع الشعب</option>
+        <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option></select>
     <div id="list"></div>
 </div>
 
-<a href="index.html" style="display:block; text-align:center; margin-top:20px;">⬅️ العودة للرئيسية</a>
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        authDomain: "school-manager-d1865.firebaseapp.com",
-        projectId: "school-manager-d1865",
-        storageBucket: "school-manager-d1865.firebasestorage.app",
-        messagingSenderId: "752295259069",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
+    const db = getFirestore(initializeApp({ /* بياناتك هنا */ }));
 
     // توليد سنوات الميلاد
-    const birthSelect = document.getElementById('birthYear');
-    for(let i=2000; i<=2035; i++) birthSelect.innerHTML += `<option value="${i}">${i}</option>`;
-
-    window.startDictation = () => {
-        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        rec.lang = 'ar-IQ';
-        rec.onresult = (e) => { document.getElementById('name').value = e.results[0][0].transcript; };
-        rec.start();
-    };
+    const b = document.getElementById('birthYear');
+    for(let i=2000; i<=2035; i++) b.innerHTML += `<option value="${i}">${i}</option>`;
 
     window.saveStudent = async () => {
         await addDoc(collection(db, "students"), {
-            name: document.getElementById('name').value,
-            id: document.getElementById('idNum').value,
-            birth: document.getElementById('birthYear').value,
-            class: document.getElementById('class').value,
+            name: document.getElementById('name').value, id: document.getElementById('idNum').value,
+            birth: document.getElementById('birthYear').value, class: document.getElementById('class').value,
             section: document.getElementById('section').value
         });
-        alert("تم الحفظ!");
         loadStudents();
     };
 
+    window.deleteStudent = async (id) => { if(confirm("حذف الطالب؟")) { await deleteDoc(doc(db, "students", id)); loadStudents(); } };
+
     window.loadStudents = async () => {
-        const snap = await getDocs(collection(db, "students"));
+        let q = collection(db, "students");
+        const snap = await getDocs(q);
+        const fC = document.getElementById('fClass').value;
+        const fS = document.getElementById('fSection').value;
         const list = document.getElementById('list');
         list.innerHTML = "";
         snap.forEach(d => {
-            const data = d.data();
-            list.innerHTML += `<div class="student-row"><span>${data.name} - ${data.id}</span> <span>${data.class} (${data.section})</span></div>`;
+            const dt = d.data();
+            if((!fC || dt.class == fC) && (!fS || dt.section == fS)) {
+                list.innerHTML += `<div class="row">
+                    <span>${dt.name || 'بدون اسم'} - ${dt.class || ''} (${dt.section || ''})</span>
+                    <button onclick="deleteStudent('${d.id}')" style="background:#dc3545; width:auto;">حذف</button>
+                </div>`;
+            }
         });
     };
     loadStudents();

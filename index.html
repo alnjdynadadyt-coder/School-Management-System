@@ -6,14 +6,15 @@
     <title>نظام الإدارة المدرسية الرقمي</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background-color: #f0f2f5; }
-        h1 { color: #333; }
-        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 30px; }
-        .btn { padding: 20px; background: #007bff; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; }
+        h1 { color: #333; margin-bottom: 30px; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; justify-items: center; }
+        .btn { padding: 20px 40px; background: #007bff; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; width: 200px; display: block; }
     </style>
 </head>
 <body>
     <h1>مرحباً بك في لوحة تحكم المدرسة</h1>
     <div class="dashboard">
+        <!-- تم ربط الزر بملف الطلاب الجديد -->
         <a href="students.html" class="btn">إدارة الطلاب</a>
         <a href="#" class="btn">تسجيل الحضور</a>
         <a href="#" class="btn">الأرشيف الرقمي</a>
@@ -34,7 +35,7 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
-        console.log("النظام متصل بقاعدة البيانات بنجاح!");
+        console.log("النظام جاهز للعمل!");
     </script>
 </body>
 </html>

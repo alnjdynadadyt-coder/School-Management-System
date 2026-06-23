@@ -6,33 +6,17 @@
     <title>نظام الإدارة المدرسية الرقمي</title>
     <style>
         body { font-family: sans-serif; text-align: center; padding: 30px; background-color: #f0f2f5; }
-        h1 { color: #333; margin-bottom: 30px; }
         .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; justify-items: center; }
-        .btn { padding: 20px 40px; background: #007bff; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; width: 200px; display: block; margin: 10px; }
+        .btn { padding: 20px 40px; background: #007bff; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; width: 220px; display: block; margin: 10px; }
     </style>
 </head>
 <body>
-    <h1>مرحباً بك في لوحة تحكم المدرسة</h1>
+    <h1>لوحة تحكم المدرسة</h1>
     <div class="dashboard">
         <a href="students.html" class="btn">إدارة الطلاب</a>
         <a href="attendance.html" class="btn">تسجيل الحضور</a>
+        <a href="reports.html" class="btn" style="background: #28a745;">تقارير الحضور</a>
         <a href="#" class="btn">الأرشيف الرقمي</a>
     </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-            authDomain: "school-manager-d1865.firebaseapp.com",
-            projectId: "school-manager-d1865",
-            storageBucket: "school-manager-d1865.firebasestorage.app",
-            messagingSenderId: "752295259069",
-            appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-        };
-
-        initializeApp(firebaseConfig);
-    </script>
 </body>
 </html>

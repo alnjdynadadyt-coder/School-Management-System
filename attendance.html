@@ -2,41 +2,60 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الحضور</title>
+    <title>تسجيل الحضور اليومي</title>
     <style>
-        body { font-family: sans-serif; padding: 15px; background: #f4f7f6; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        .row { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding: 10px 0; }
-        .status-btn { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .btn-status { padding: 8px 15px; border-radius: 5px; border: none; cursor: pointer; font-weight: bold; }
         .present { background: #d4edda; color: #155724; }
         .absent { background: #f8d7da; color: #721c24; }
         .excused { background: #fff3cd; color: #856404; }
+        select, input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>تسجيل الحضور</h3>
+    <h3>بيانات الدرس</h3>
+    <input type="text" id="subject" placeholder="اسم المادة">
+    <select id="lesson">
+        <option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option>
+        <option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option>
+    </select>
     <select id="fClass">
         <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
     </select>
-    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option></select>
-    <button onclick="loadStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none;">جلب قائمة الطلاب</button>
+    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+    <button onclick="loadStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none; border-radius:5px;">جلب قائمة الطلاب</button>
 </div>
 
-<div class="card" id="list"></div>
-<button onclick="saveAttendance()" style="width:100%; padding:15px; background:#28a745; color:white; border:none;">💾 حفظ الحضور اليومي</button>
+<div class="card" id="list">
+    <p style="text-align:center;">اختر الصف والشعبة واضغط جلب القائمة</p>
+</div>
+
+<button onclick="saveAttendance()" style="width:100%; padding:15px; background:#28a745; color:white; border:none; border-radius:5px; font-size:18px;">💾 حفظ الحضور</button>
+<br><br>
+<a href="index.html" style="display:block; text-align:center; color:#555;">⬅️ العودة للرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs, addDoc, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* بياناتك هنا */ }));
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        authDomain: "school-manager-d1865.firebaseapp.com",
+        projectId: "school-manager-d1865",
+        storageBucket: "school-manager-d1865.firebasestorage.app",
+        messagingSenderId: "752295259069",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
 
     window.toggleStatus = (btn) => {
-        if (btn.classList.contains('present')) { btn.className = 'status-btn absent'; btn.innerText = 'غائب'; }
-        else if (btn.classList.contains('absent')) { btn.className = 'status-btn excused'; btn.innerText = 'مجاز'; }
-        else { btn.className = 'status-btn present'; btn.innerText = 'حاضر'; }
+        if (btn.classList.contains('present')) { btn.className = 'btn-status absent'; btn.innerText = 'غائب'; }
+        else if (btn.classList.contains('absent')) { btn.className = 'btn-status excused'; btn.innerText = 'مجاز'; }
+        else { btn.className = 'btn-status present'; btn.innerText = 'حاضر'; }
     };
 
     window.loadStudents = async () => {
@@ -48,21 +67,24 @@
         list.innerHTML = "";
         snap.forEach(d => {
             const dt = d.data();
-            list.innerHTML += `<div class="row">
+            list.innerHTML += `<div class="student-row">
                 <span>${dt.name}</span>
-                <button class="status-btn present" onclick="toggleStatus(this)">حاضر</button>
+                <button class="btn-status present" onclick="toggleStatus(this)">حاضر</button>
             </div>`;
         });
     };
 
     window.saveAttendance = async () => {
-        const rows = document.querySelectorAll('.row');
+        const rows = document.querySelectorAll('.student-row');
+        const lesson = document.getElementById('lesson').value;
+        const subject = document.getElementById('subject').value;
         rows.forEach(async (row) => {
             await addDoc(collection(db, "attendance"), {
                 name: row.children[0].innerText,
                 status: row.children[1].innerText,
-                date: new Date().toLocaleDateString('ar-IQ'),
-                class: document.getElementById('fClass').value
+                lesson: lesson,
+                subject: subject,
+                date: new Date().toLocaleDateString('ar-IQ')
             });
         });
         alert("تم حفظ الحضور بنجاح!");

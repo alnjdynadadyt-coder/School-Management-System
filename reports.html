@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>تقرير الحضور اليومي</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f9f9f9; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background: #f2f2f2; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3>تقرير الحضور والغياب</h3>
+    <input type="date" id="datePicker">
+    <select id="fClass">
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الأدبي</option><option>الخامس الأدبي</option><option>السادس الأدبي</option>
+    </select>
+    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+    <button onclick="showReport()" style="width:100%; padding:10px; background:#6c757d; color:white; border:none; border-radius:5px; margin-top:10px;">عرض التقرير</button>
+</div>
+
+<div class="card" id="reportArea"></div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        authDomain: "school-manager-d1865.firebaseapp.com",
+        projectId: "school-manager-d1865",
+        storageBucket: "school-manager-d1865.firebasestorage.app",
+        messagingSenderId: "752295259069",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
+
+    window.showReport = async () => {
+        const date = document.getElementById('datePicker').value;
+        const c = document.getElementById('fClass').value;
+        const snap = await getDocs(collection(db, "attendance"));
+        
+        let html = `<table><tr><th>الطالب</th><th>المادة</th><th>الدرس</th><th>الحالة</th></tr>`;
+        
+        snap.forEach(d => {
+            const dt = d.data();
+            // نطابق التاريخ المختار مع التاريخ المخزن
+            if(dt.date == new Date(date).toLocaleDateString('ar-IQ') || dt.date == date) {
+                if(dt.class == c) {
+                    html += `<tr><td>${dt.name}</td><td>${dt.subject}</td><td>${dt.lesson}</td><td>${dt.status}</td></tr>`;
+                }
+            }
+        });
+        
+        html += `</table>`;
+        document.getElementById('reportArea').innerHTML = html || "لا توجد بيانات لهذا اليوم";
+    };
+</script>
+</body>
+</html>

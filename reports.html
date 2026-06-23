@@ -20,8 +20,8 @@
     <div class="grid-filters">
         <input type="date" id="start">
         <input type="date" id="end">
-        <select id="fClass"><option value="">المرحلة</option><option>الرابع العلمي</option><option>السادس العلمي</option></select>
-        <select id="fSection"><option value="">الشعبة</option><option>أ</option><option>ب</option></select>
+        <select id="fClass"><option value="">المرحلة</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
+        <select id="fSection"><option value="">الشعبة</option><option>أ</option><option>ب</option><option>ج</option></select>
     </div>
     <button onclick="generateReport()" style="width:100%; padding:12px; background:#28a745; color:white; border:none; margin-top:10px;">📊 استخراج التقرير</button>
 </div>
@@ -29,8 +29,8 @@
 <div class="card" id="reportArea"></div>
 
 <div style="text-align:center;">
-    <button class="btn-export" style="background:#dc3545;" onclick="alert('جارٍ تجهيز ملف PDF...')">تحميل PDF</button>
-    <button class="btn-export" style="background:#218838;" onclick="alert('جارٍ تجهيز ملف Excel...')">تحميل Excel</button>
+    <button class="btn-export" style="background:#dc3545;" onclick="alert('تنبيه: ميزة PDF قيد التطوير')">تحميل PDF</button>
+    <button class="btn-export" style="background:#218838;" onclick="alert('تنبيه: ميزة Excel قيد التطوير')">تحميل Excel</button>
     <br><br>
     <a href="index.html">⬅️ العودة للرئيسية</a>
 </div>
@@ -39,18 +39,25 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        authDomain: "school-manager-d1865.firebaseapp.com",
+        projectId: "school-manager-d1865",
+        storageBucket: "school-manager-d1865.firebasestorage.app",
+        messagingSenderId: "752295259069",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
 
     window.generateReport = async () => {
         const snap = await getDocs(collection(db, "attendance"));
         const sClass = document.getElementById('fClass').value;
         const sSection = document.getElementById('fSection').value;
         
-        let reportData = {}; // لتجميع غيابات كل طالب
+        let reportData = {}; 
 
         snap.forEach(d => {
             const dt = d.data();
-            // تصفية حسب الصف والشعبة
+            // تصفية حسب الصف والشعبة والغياب فقط
             if((!sClass || dt.class === sClass) && dt.status !== "حاضر") {
                 if(!reportData[dt.name]) {
                     reportData[dt.name] = { count: 0, details: [] };
@@ -60,12 +67,14 @@
             }
         });
 
-        let html = `<table><tr><th>اسم الطالب</th><th>عدد الدروس الغائب عنها</th><th>التفاصيل</th></tr>`;
+        let html = `<table><tr><th>اسم الطالب</th><th>عدد مرات الغياب/الإجازة</th><th>التفاصيل</th></tr>`;
+        let found = false;
         for (let name in reportData) {
             html += `<tr><td>${name}</td><td>${reportData[name].count}</td><td>${reportData[name].details.join('، ')}</td></tr>`;
+            found = true;
         }
         html += `</table>`;
-        document.getElementById('reportArea').innerHTML = html;
+        document.getElementById('reportArea').innerHTML = found ? html : "<p style='text-align:center;'>لا توجد بيانات غياب مطابقة للفلتر</p>";
     };
 </script>
 </body>

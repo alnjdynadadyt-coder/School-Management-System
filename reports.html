@@ -65,11 +65,16 @@
     let allStudents = [];
 
     async function init() {
-        const snap = await getDocs(collection(db, "students"));
-        allStudents = snap.docs.map(d => d.data());
-        let classes = [...new Set(allStudents.map(s => s.class))].sort();
-        classes.forEach(c => document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`);
-    }
+    const snap = await getDocs(collection(db, "students"));
+    allStudents = snap.docs.map(d => d.data());
+    let classes = [...new Set(allStudents.map(s => s.class))].sort();
+    
+    classes.forEach(c => {
+        document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`;
+        document.getElementById('delClass').innerHTML += `<option value="${c}">${c}</option>`;
+    });
+}
+
     init();
 
     window.updateSections = () => {
@@ -80,6 +85,13 @@
         secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
         ss.onchange = updateStudents;
     };
+document.getElementById('delClass').onchange = () => {
+    const cls = document.getElementById('delClass').value;
+    const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
+    const ds = document.getElementById('delSection');
+    ds.innerHTML = '<option value="">الشعبة...</option>';
+    secs.forEach(s => ds.innerHTML += `<option value="${s}">${s}</option>`);
+};
 
     window.updateStudents = () => {
         const cls = document.getElementById('sClass').value;
@@ -90,14 +102,43 @@
     };
 
     window.clearAllData = async () => {
-        const pass = prompt("أدخل كلمة المرور للإدارة:");
-        if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
-        const snap = await getDocs(collection(db, "attendance"));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        alert("تم مسح السجلات بنجاح!"); location.reload();
-    };
+    const pass = prompt("أدخل كلمة المرور للإدارة:");
+    if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
+
+    const from = document.getElementById('delFrom').value;
+    const to = document.getElementById('delTo').value;
+    const cls = document.getElementById('delClass').value;
+    const sec = document.getElementById('delSection').value;
+
+    if(!from || !to || !cls || !sec) { 
+        alert("يرجى اختيار التاريخ (من وإلى) والصف والشعبة أولاً!"); 
+        return; 
+    }
+
+    const snap = await getDocs(collection(db, "attendance"));
+    const batch = writeBatch(db);
+    let count = 0;
+
+    snap.forEach(d => {
+        const data = d.data();
+        // التحقق من أن السجل يطابق التاريخ والصف والشعبة
+        if(data.date >= from && data.date <= to && data.class === cls && data.section === sec) {
+            batch.delete(d.ref);
+            count++;
+        }
+    });
+
+    if(count > 0) {
+        if(confirm(`تم العثور على ${count} سجل. هل أنت متأكد من حذفها؟`)) {
+            await batch.commit();
+            alert("تم حذف " + count + " سجل بنجاح!");
+            location.reload();
+        }
+    } else {
+        alert("لا توجد سجلات تطابق هذه المعايير.");
+    }
+};
+
 
     window.fetchDailyTable = async () => {
         const date = document.getElementById('dailyDate').value;

@@ -6,45 +6,40 @@
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
+        .report-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .tag { padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-right: 3px; }
+        .summary-box { background: #d1ecf1; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-right: 5px solid #0c5460; }
         .absent { background: #f8d7da; color: #721c24; }
         .excused { background: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
 
-<div class="card" style="border: 2px solid #dc3545;">
-    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">إعادة ضبط النظام (حذف جميع سجلات الحضور)</button>
+<div class="card" style="border: 1px solid #dc3545;">
+    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">إعادة ضبط النظام (حذف سجلات الحضور)</button>
 </div>
 
 <div class="card">
-    <h4>📋 التقرير اليومي (جدول مخصص)</h4>
-    <div class="grid-row">
-        <input type="date" id="dailyDate">
-        <button onclick="fetchDailyTable()" style="background:#28a745; color:white; border:none;">عرض تقرير اليوم</button>
-    </div>
+    <h4>📋 التقرير اليومي</h4>
+    <input type="date" id="dailyDate">
+    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none; padding:10px;">عرض تقرير اليوم</button>
 </div>
 
 <div class="card">
-    <h4>🔍 سجل الطالب أو الصف</h4>
+    <h4>🔍 سجل الطالب المفصل</h4>
     <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
-    <select id="sSection"><option value="">اختر الشعبة...</option></select>
-    <div class="grid-row">
-        <input type="date" id="dateFrom" title="من تاريخ">
-        <input type="date" id="dateTo" title="إلى تاريخ">
-    </div>
-    <select id="sStudent"><option value="all">تقرير شامل للصف والشعبة</option></select>
-    <button onclick="fetchReports()" style="background:#007bff; color:white; border:none;">استخراج التقرير</button>
+    <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
+    <select id="sStudent"><option value="">اختر الطالب...</option></select>
+    <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">استخراج السجل مع الخلاصة</button>
 </div>
 
 <div id="res" class="card"></div>
+<a href="index.html" style="display:block; text-align:center; margin:15px 0; color:#555;">⬅️ العودة للقائمة الرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
@@ -55,11 +50,15 @@
     document.getElementById('dailyDate').valueAsDate = new Date();
     let allStudents = [];
 
+    // تحميل الطلاب عند فتح الصفحة
     async function init() {
-        const snap = await getDocs(collection(db, "students"));
-        allStudents = snap.docs.map(d => d.data());
-        let classes = [...new Set(allStudents.map(s => s.class))].sort();
-        classes.forEach(c => document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`);
+        try {
+            const snap = await getDocs(collection(db, "students"));
+            allStudents = snap.docs.map(d => d.data());
+            let classes = [...new Set(allStudents.map(s => s.class))].sort();
+            const sc = document.getElementById('sClass');
+            classes.forEach(c => sc.innerHTML += `<option value="${c}">${c}</option>`);
+        } catch (e) { console.error("خطأ في تحميل الطلاب", e); }
     }
     init();
 
@@ -69,60 +68,76 @@
         const ss = document.getElementById('sSection');
         ss.innerHTML = '<option value="">اختر الشعبة...</option>';
         secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
-        ss.onchange = updateStudents;
     };
 
     window.updateStudents = () => {
         const cls = document.getElementById('sClass').value;
         const sec = document.getElementById('sSection').value;
+        const students = allStudents.filter(s => s.class === cls && s.section === sec);
         const st = document.getElementById('sStudent');
-        st.innerHTML = '<option value="all">تقرير شامل للصف والشعبة</option>';
-        allStudents.filter(s => s.class === cls && s.section === sec).forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
+        st.innerHTML = '<option value="">اختر الطالب...</option>';
+        students.forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
     };
 
+    // إضافة كلمة مرور للحذف
     window.clearAllData = async () => {
-        const pass = prompt("أدخل كلمة المرور للإدارة:");
+        const pass = prompt("يرجى إدخال كلمة مرور الإدارة للحذف:");
         if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
-        const snap = await getDocs(collection(db, "attendance"));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        alert("تم مسح السجلات بنجاح!"); location.reload();
-    };
-
-    window.fetchDailyTable = async () => {
-        const date = document.getElementById('dailyDate').value;
-        const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>تقرير ${date}</h4><table class="report-table"><tr><th>الطالب</th><th>المادة</th><th>الحالة</th></tr>`;
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.date === date && data.status !== "حاضر") {
-                html += `<tr><td>${data.name}<br><small>${data.class}-${data.section}</small></td><td>${data.lesson}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
-            }
-        });
-        document.getElementById('res').innerHTML = html + `</table>`;
-    };
-
-    window.fetchReports = async () => {
-        const cls = document.getElementById('sClass').value;
-        const sec = document.getElementById('sSection').value;
-        const student = document.getElementById('sStudent').value;
-        const dFrom = document.getElementById('dateFrom').value;
-        const dTo = document.getElementById('dateTo').value;
-
-        const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>التقرير من ${dFrom} إلى ${dTo}</h4>`;
+        if(!confirm("⚠️ هل أنت متأكد من حذف جميع السجلات نهائياً؟")) return;
         
-        snap.forEach(d => {
-            const data = d.data();
-            const dateValid = (!dFrom || data.date >= dFrom) && (!dTo || data.date <= dTo);
-            const match = (data.class === cls && data.section === sec) && (student === "all" || data.name === student);
-            
-            if(dateValid && match) {
-                html += `<div class="report-table">${data.date} | ${data.name} | ${data.lesson} | ${data.status}</div>`;
+        const snap = await getDocs(collection(db, "attendance"));
+        snap.forEach(async (d) => await deleteDoc(doc(db, "attendance", d.id)));
+        alert("تم الحذف بنجاح!"); location.reload();
+    };
+
+    window.fetchDaily = async () => {
+        const date = document.getElementById('dailyDate').value;
+        const resDiv = document.getElementById('res');
+        resDiv.innerHTML = `<h4>غيابات ${date}</h4>`;
+        try {
+            const snap = await getDocs(collection(db, "attendance"));
+            let dailyData = {};
+            snap.forEach(d => {
+                const data = d.data();
+                if(data.date === date && data.status !== "حاضر") {
+                    if(!dailyData[data.name]) dailyData[data.name] = { class: data.class, sec: data.section, lessons: [] };
+                    dailyData[data.name].lessons.push(data.lesson + ": " + data.status);
+                }
+            });
+            for(let name in dailyData) {
+                resDiv.innerHTML += `<div class="report-item"><div><strong>${name}</strong><br><small>${dailyData[name].class} - ${dailyData[name].sec}</small></div><div>${dailyData[name].lessons.map(l => `<span class="tag absent">${l}</span>`).join('')}</div></div>`;
             }
-        });
-        document.getElementById('res').innerHTML = html;
+        } catch(e) { resDiv.innerHTML += "لا توجد سجلات حالياً."; }
+    };
+
+    window.fetchStudentReport = async () => {
+        const name = document.getElementById('sStudent').value;
+        const resDiv = document.getElementById('res');
+        if(!name) { alert("حدد الطالب!"); return; }
+        try {
+            const snap = await getDocs(collection(db, "attendance"));
+            let report = {};
+            snap.forEach(d => {
+                const data = d.data();
+                if(data.name === name) {
+                    if(!report[data.date]) report[data.date] = { items: [] };
+                    report[data.date].items.push(data.status);
+                }
+            });
+
+            let fullAbsent = 0, partAbsent = 0, fullExcused = 0, partExcused = 0;
+            for(let d in report) {
+                let a = report[d].items.filter(i => i === "غائب").length;
+                let e = report[d].items.filter(i => i === "مجاز").length;
+                if(a >= 4) fullAbsent++; else partAbsent += a;
+                if(e >= 4) fullExcused++; else partExcused += e;
+            }
+
+            resDiv.innerHTML = `<div class="summary-box"><strong>الخلاصة لـ ${name}:</strong><br>أيام الغياب: ${(fullAbsent + (partAbsent/4)).toFixed(1)} يوم<br>أيام الإجازات: ${(fullExcused + (partExcused/4)).toFixed(1)} يوم</div>`;
+            for(let date in report) {
+                resDiv.innerHTML += `<div class="report-item"><strong>${date}</strong><div>${report[date].items.map(i => `<span class="tag ${i==='غائب'?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
+            }
+        } catch(e) { resDiv.innerHTML = "لا يوجد سجل لهذا الطالب."; }
     };
 </script>
 </body>

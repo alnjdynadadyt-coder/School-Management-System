@@ -17,64 +17,44 @@
 <body>
 
 <div class="card">
-    <h4>🔍 سجل غيابات الطالب</h4>
-    <input type="text" id="studentName" placeholder="اسم الطالب بالكامل...">
-    <div class="row">
-        <div><label>من:</label><input type="date" id="startDate"></div>
-        <div><label>إلى:</label><input type="date" id="endDate"></div>
-    </div>
-    <button onclick="getStudentReport()" style="background:#007bff; color:white; border:none; margin-top:10px;">استخراج السجل</button>
+    <h4>🔍 سجل الطالب المفصل (باليوم)</h4>
+    <input type="text" id="studentName" placeholder="اسم الطالب...">
+    <button onclick="getStudentReport()" style="background:#007bff; color:white;">عرض السجل</button>
 </div>
 
 <div id="reportResult" class="card"></div>
-<a href="index.html" style="display:block; text-align:center;">العودة للرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
+    const db = getFirestore(initializeApp({ /* أضف بيانات الـ config هنا */ }));
 
     window.getStudentReport = async () => {
         const name = document.getElementById('studentName').value;
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
         const resDiv = document.getElementById('reportResult');
-        
         resDiv.innerHTML = "جاري تجميع البيانات...";
 
         const q = query(collection(db, "attendance"), where("name", "==", name));
         const snap = await getDocs(q);
         
+        // تجميع الحالات حسب التاريخ
         let reportData = {};
         snap.forEach(d => {
             const data = d.data();
-            // الفلترة بالتاريخ
-            if ((!start || data.date >= start) && (!end || data.date <= end)) {
-                if(data.status !== "حاضر") {
-                    if(!reportData[data.date]) reportData[data.date] = [];
-                    reportData[data.date].push(`${data.lesson}: ${data.status}`);
-                }
+            if(data.status !== "حاضر") {
+                if(!reportData[data.date]) reportData[data.date] = [];
+                reportData[data.date].push(`${data.lesson}: ${data.status}`);
             }
         });
 
-        resDiv.innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
-        const sortedDates = Object.keys(reportData).sort();
-        
-        if (sortedDates.length === 0) {
-            resDiv.innerHTML += "<p>لا توجد سجلات غياب في هذه الفترة.</p>";
-        } else {
-            sortedDates.forEach(date => {
-                resDiv.innerHTML += `
-                    <div class="report-day">
-                        <strong>التاريخ: ${date}</strong><br>
-                        ${reportData[date].map(item => `<span class="status-tag ${item.includes('غائب') ? 'absent' : 'excused'}">${item}</span>`).join(' ')}
-                    </div>`;
-            });
+        resDiv.innerHTML = `<h4>سجل غيابات الطالب: ${name}</h4>`;
+        for(let date in reportData) {
+            resDiv.innerHTML += `
+                <div class="report-day">
+                    <strong>${date}:</strong><br>
+                    ${reportData[date].map(item => `<span class="status-tag ${item.includes('غائب') ? 'absent' : 'excused'}">${item}</span>`).join(' ')}
+                </div>`;
         }
     };
 </script>

@@ -7,8 +7,9 @@
         body { font-family: sans-serif; padding: 15px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
         select, input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
-        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
         .back-link { display: block; text-align: center; margin-top: 15px; color: #555; text-decoration: none; }
+        .student-row { background: #fff; padding: 10px; margin-top: 5px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
@@ -38,15 +39,37 @@
     <a href="index.html" class="back-link">⬅️ العودة للرئيسية</a>
 </div>
 
-<div id="studentList"></div>
+<div id="studentList" class="card"></div>
 
 <script type="module">
-    // تعيين التاريخ تلقائياً
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        authDomain: "school-manager-d1865.firebaseapp.com",
+        projectId: "school-manager-d1865",
+        storageBucket: "school-manager-d1865.firebasestorage.app",
+        messagingSenderId: "752295259069",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
+
     document.getElementById('date').valueAsDate = new Date();
     
-    // هذه الدالة ستقوم بجلب الطلاب (سنربطها لاحقاً بقاعدة البيانات)
-    window.fetchStudents = () => {
-        alert("جاري الاتصال بقاعدة البيانات لجلب الطلاب...");
+    window.fetchStudents = async () => {
+        const sClass = document.getElementById('fClass').value;
+        const sSection = document.getElementById('fSection').value;
+        const listDiv = document.getElementById('studentList');
+        listDiv.innerHTML = "جاري التحميل...";
+
+        const q = query(collection(db, "students"), where("class", "==", sClass), where("section", "==", sSection));
+        const querySnapshot = await getDocs(q);
+        
+        listDiv.innerHTML = "";
+        querySnapshot.forEach((doc) => {
+            const student = doc.data();
+            listDiv.innerHTML += `<div class="student-row">${student.name} <span>[حاضر] [غائب] [مجاز]</span></div>`;
+        });
     };
 </script>
 </body>

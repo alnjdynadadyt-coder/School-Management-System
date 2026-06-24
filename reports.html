@@ -1,41 +1,101 @@
-window.renderDailyReport = async () => {
-    const date = document.getElementById('dailyDate').value;
-    const snap = await getDocs(collection(db, "attendance"));
-    
-    // 1. تجميع الغائبين والمجازين فقط
-    let absentees = {}; 
-    snap.forEach(d => {
-        let data = d.data();
-        if(data.date === date && data.status !== "حاضر") { // فلترة الحاضرين
-            if(!absentees[data.name]) {
-                absentees[data.name] = { 
-                    lessons: {}, 
-                    class: data.class, 
-                    section: data.section 
-                };
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>نظام التقارير المتكامل</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
+        .btn-export { background: #17a2b8; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="card" style="border: 2px solid #dc3545;">
+    <button onclick="clearAllData()" style="background:#dc3545; color:white;">إعادة ضبط النظام (حذف سجلات الحضور)</button>
+</div>
+
+<div class="card">
+    <h4>📋 التقرير اليومي (عرض الغائبين والمجازين فقط)</h4>
+    <input type="date" id="dailyDate">
+    <button onclick="fetchDailyTable()" style="background:#28a745; color:white;">عرض التقرير</button>
+</div>
+
+<div class="card">
+    <h4>🔍 سجل الطالب المفرد</h4>
+    <select id="sClass"><option value="">اختر الصف...</option></select>
+    <select id="sSection"><option value="">اختر الشعبة...</option></select>
+    <select id="sStudent"><option value="all">اختر الطالب...</option></select>
+    <div class="grid-row">
+        <input type="date" id="dateFrom">
+        <input type="date" id="dateTo">
+    </div>
+    <button onclick="fetchReports()" style="background:#007bff; color:white;">استخراج التقرير</button>
+</div>
+
+<div id="res" class="card"></div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const db = getFirestore(initializeApp({ 
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", 
+        projectId: "school-manager-d1865", 
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4" 
+    }));
+
+    // دالة التقرير اليومي (تظهر فقط من لديه غياب أو إجازة)
+    window.fetchDailyTable = async () => {
+        const date = document.getElementById('dailyDate').value;
+        const snap = await getDocs(collection(db, "attendance"));
+        
+        let reportData = {};
+        snap.forEach(d => {
+            let data = d.data();
+            // شرط الفلترة: اليوم المحدد + الحالة ليست "حاضر"
+            if(data.date === date && data.status !== "حاضر") {
+                if(!reportData[data.name]) reportData[data.name] = { class: data.class, section: data.section, lessons: {} };
+                reportData[data.name].lessons[data.lesson] = data.status;
             }
-            absentees[data.name].lessons[data.lesson] = data.status;
-        }
-    });
+        });
 
-    // 2. التحقق من وجود بيانات
-    if (Object.keys(absentees).length === 0) {
-        document.getElementById('res').innerHTML = "<p>لا يوجد غيابات أو إجازات مسجلة لهذا التاريخ.</p>";
-        return;
-    }
-
-    // 3. رسم الجدول (للغائبين فقط)
-    let html = `<h3>تقرير يوم ${date} (الغياب والإجازات فقط)</h3>
-    <table id="myTable" class="report-table">
-        <tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>الدرس 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>`;
-    
-    for(let name in absentees) {
-        let s = absentees[name];
-        html += `<tr><td>${name}</td><td>${s.class}-${s.section}</td>`;
-        for(let i=1; i<=6; i++) {
-            html += `<td>${s.lessons['الدرس '+i] || '-'}</td>`;
+        let html = `<h4>تقرير يوم ${date} (الاستثناءات فقط)</h4>
+                    <table id="exportTable" class="report-table">
+                    <tr><th>الطالب</th><th>الصف</th><th>د1</th><th>د2</th><th>د3</th><th>د4</th><th>د5</th><th>د6</th></tr>`;
+        
+        for(let name in reportData) {
+            html += `<tr><td>${name}</td><td>${reportData[name].class}-${reportData[name].section}</td>`;
+            for(let i=1; i<=6; i++) {
+                html += `<td>${reportData[name].lessons['الدرس '+i] || ''}</td>`;
+            }
+            html += `</tr>`;
         }
-        html += `</tr>`;
-    }
-    document.getElementById('res').innerHTML = html + `</table><button onclick="exportExcel()">تصدير Excel</button>`;
-};
+        
+        document.getElementById('res').innerHTML = html + `</table>
+        <button class="btn-export" onclick="exportExcel()">تصدير إلى Excel</button>`;
+    };
+
+    window.exportExcel = () => {
+        const wb = XLSX.utils.table_to_book(document.getElementById('exportTable'));
+        XLSX.writeFile(wb, "تقرير_الغياب.xlsx");
+    };
+
+    window.clearAllData = async () => {
+        if(prompt("أدخل كلمة المرور:") !== "1234") return;
+        const snap = await getDocs(collection(db, "attendance"));
+        const batch = writeBatch(db);
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        location.reload();
+    };
+
+    // (يمكنك إضافة منطق fetchReports هنا لاحقاً في الخطوة الثانية)
+</script>
+</body>
+</html>

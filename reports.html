@@ -2,55 +2,118 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>نظام التقارير الإداري المتكامل</title>
+    <title>التقارير المتكاملة</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; }
-        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        select, input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
-        .btn-green { background: #28a745; color: white; border: none; }
-        .btn-blue { background: #007bff; color: white; border: none; }
-        .btn-red { background: #dc3545; color: white; border: none; }
+        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
+        .absent { background: #f8d7da; color: #721c24; }
+        .excused { background: #fff3cd; color: #856404; }
+        .fixed-back { position: fixed; bottom: 10px; left: 10px; background: #333; color: white; padding: 10px 20px; border-radius: 20px; text-decoration: none; }
     </style>
 </head>
 <body>
 
-<div class="card" style="border-right: 5px solid #dc3545;">
-    <h3>⚠️ حذف السجلات المخصص</h3>
-    <input type="date" id="delFrom">
-    <input type="date" id="delTo">
-    <select id="delClass"></select>
-    <button class="btn-red" onclick="confirmDelete()">حذف السجلات المختارة</button>
+<div class="card" style="border: 2px solid #dc3545;">
+    <h4>⚠️ حذف سجلات مخصص</h4>
+    <input type="date" id="delFrom"> <input type="date" id="delTo">
+    <select id="delClass"><option value="">اختر الصف للحذف</option></select>
+    <button onclick="advancedDelete()" style="background:#dc3545; color:white; border:none;">تنفيذ الحذف المشروط</button>
 </div>
 
 <div class="card">
-    <h3>📋 التقرير اليومي</h3>
+    <h4>📋 التقرير اليومي</h4>
     <input type="date" id="dailyDate">
-    <button class="btn-green" onclick="renderDailyReport()">عرض تقرير اليوم</button>
+    <button onclick="renderDailyReport()" style="background:#28a745; color:white; border:none;">عرض وتصدير التقرير</button>
 </div>
 
 <div class="card">
-    <h3>🔍 التقرير الشامل</h3>
-    <div style="display:flex; gap:10px;">
-        <input type="date" id="start">
-        <input type="date" id="end">
-    </div>
-    <select id="sClass"></select>
-    <select id="sStudent"></select>
-    <button class="btn-blue" onclick="renderFullReport()">استخراج التقرير وتصديره</button>
+    <h4>🔍 تقرير شامل / مفرد</h4>
+    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
+    <select id="sSection"><option value="">اختر الشعبة...</option></select>
+    <select id="sStudent"><option value="all">تقرير شامل للصف</option></select>
+    <button onclick="renderFullReport()" style="background:#007bff; color:white; border:none;">عرض وتصدير التقرير</button>
 </div>
 
 <div id="res" class="card"></div>
+<a href="index.html" class="fixed-back">⬅️ العودة</a>
 
 <script type="module">
-    // هنا يتم دمج كود Firebase ومنطق المعالجة
-    // سأقوم الآن بكتابة منطق تجميع "الغيابات" و "الإجازات" 
-    // والمعادلة (4 دروس = 1 يوم) وتفعيل أزرار التصدير.
-</script>
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
+    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
+
+    let allStudents = [];
+    async function init() {
+        const snap = await getDocs(collection(db, "students"));
+        allStudents = snap.docs.map(d => d.data());
+        allStudents.forEach(s => {
+            if(![...document.getElementById('sClass').options].find(o=>o.value==s.class))
+                document.getElementById('sClass').innerHTML += `<option value="${s.class}">${s.class}</option>`;
+            if(![...document.getElementById('delClass').options].find(o=>o.value==s.class))
+                document.getElementById('delClass').innerHTML += `<option value="${s.class}">${s.class}</option>`;
+        });
+    }
+    init();
+
+    window.updateSections = () => {
+        const cls = document.getElementById('sClass').value;
+        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))];
+        const ss = document.getElementById('sSection');
+        ss.innerHTML = '<option value="">اختر الشعبة...</option>';
+        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
+    };
+
+    // [إضافة المنطق المجمّع]
+    window.renderDailyReport = async () => {
+        const date = document.getElementById('dailyDate').value;
+        const snap = await getDocs(collection(db, "attendance"));
+        let report = {};
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.date === date) {
+                if(!report[data.name]) report[data.name] = { class: data.class, lessons: {} };
+                report[data.name].lessons[data.lesson] = data.status;
+            }
+        });
+        
+        let html = `<h3>تقرير يوم ${date}</h3><table id="myTable" class="report-table"><tr><th>الطالب</th><th>الدرس 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>`;
+        for(let name in report) {
+            html += `<tr><td>${name}</td>` + [1,2,3,4,5,6].map(i => `<td>${report[name].lessons['الدرس '+i] || ''}</td>`).join('') + `</tr>`;
+        }
+        document.getElementById('res').innerHTML = html + `</table><button onclick="exportExcel()">تصدير Excel</button>`;
+    };
+
+    window.advancedDelete = async () => {
+        const pass = prompt("كلمة المرور:");
+        if(pass !== "1234") return;
+        const cls = document.getElementById('delClass').value;
+        const from = document.getElementById('delFrom').value;
+        const to = document.getElementById('delTo').value;
+        
+        const snap = await getDocs(collection(db, "attendance"));
+        const batch = writeBatch(db);
+        let count = 0;
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.class === cls && data.date >= from && data.date <= to) {
+                batch.delete(d.ref); count++;
+            }
+        });
+        if(confirm(`سيتم حذف ${count} سجل. هل أنت متأكد؟`)) { await batch.commit(); alert("تم!"); location.reload(); }
+    };
+
+    window.exportExcel = () => {
+        const wb = XLSX.utils.table_to_book(document.getElementById('myTable'));
+        XLSX.writeFile(wb, "Report.xlsx");
+    };
+</script>
 </body>
 </html>

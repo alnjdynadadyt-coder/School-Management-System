@@ -5,10 +5,11 @@
     <title>تسجيل الحضور</title>
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; }
-        select, input { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
-        .student-row { display: flex; justify-content: space-between; padding: 10px; border-bottom: 1px solid #eee; align-items: center; }
-        .status-btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        select, input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
+        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 12px; border-bottom: 1px solid #eee; }
+        .status-btn { padding: 8px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; transition: 0.3s; }
         .present { background: #d4edda; color: #155724; }
         .absent { background: #f8d7da; color: #721c24; }
         .excused { background: #fff3cd; color: #856404; }
@@ -17,20 +18,20 @@
 <body>
 
 <div class="card">
-    <h3>بيانات الدرس</h3>
+    <h3>تسجيل الحضور اليومي</h3>
     <input type="date" id="date">
     <select id="subject"><option>الاسلامية</option><option>العربي</option><option>الانكليزي</option><option>الرياضيات</option><option>الفيزياء</option><option>الكيمياء</option><option>الاحياء</option><option>الحاسوب</option><option>الجغرافية</option><option>التاريخ</option><option>الاجتماع</option><option>الفلسفة</option><option>الاقتصاد</option><option>الجرائم</option><option>الرياضة</option><option>الفنية</option><option>أخرى</option></select>
     <select id="lesson"><option>الدرس الأول</option><option>الثاني</option><option>الثالث</option><option>الرابع</option><option>الخامس</option><option>السادس</option><option>السابع</option></select>
     <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
     <select id="fSection"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
-    <button onclick="fetchStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none; margin-top:10px;">جلب قائمة الطلاب</button>
+    <button onclick="fetchStudents()">جلب قائمة الطلاب</button>
 </div>
 
 <div id="studentList" class="card"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
@@ -43,6 +44,7 @@
 
     document.getElementById('date').valueAsDate = new Date();
 
+    // دالة تبديل الحالة الذكية
     window.toggleStatus = (btn) => {
         if (btn.innerText === "حاضر") { btn.innerText = "غائب"; btn.className = "status-btn absent"; }
         else if (btn.innerText === "غائب") { btn.innerText = "مجاز"; btn.className = "status-btn excused"; }
@@ -51,7 +53,7 @@
 
     window.fetchStudents = async () => {
         const listDiv = document.getElementById('studentList');
-        listDiv.innerHTML = "جاري الجلب...";
+        listDiv.innerHTML = "جاري التحميل...";
         const q = query(collection(db, "students"), where("class", "==", document.getElementById('fClass').value), where("section", "==", document.getElementById('fSection').value));
         const snap = await getDocs(q);
         listDiv.innerHTML = "";

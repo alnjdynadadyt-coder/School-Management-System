@@ -1,81 +1,41 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقارير المتكاملة</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-        .btn-export { background: #17a2b8; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
-    </style>
-</head>
-<body>
-
-<div class="card" style="border: 2px solid #dc3545;">
-    <button onclick="clearAllData()">إعادة ضبط النظام (حذف سجلات الحضور)</button>
-</div>
-
-<div class="card">
-    <h4>📋 التقرير اليومي</h4>
-    <input type="date" id="dailyDate">
-    <button onclick="fetchDailyTable()" style="background:#28a745; color:white;">عرض التقرير</button>
-</div>
-
-<div id="res" class="card"></div>
-<a href="index.html" style="display:block; text-align:center; margin:15px 0;">⬅️ العودة للقائمة الرئيسية</a>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const db = getFirestore(initializeApp({ 
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", 
-        projectId: "school-manager-d1865", 
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4" 
-    }));
-
-    // دالة عرض التقرير اليومي المجمعة (بدون تكرار)
-    window.fetchDailyTable = async () => {
-        const date = document.getElementById('dailyDate').value;
-        const snap = await getDocs(collection(db, "attendance"));
-        
-        let reportData = {};
-        snap.forEach(d => {
-            let data = d.data();
-            if(data.date === date) {
-                if(!reportData[data.name]) reportData[data.name] = { lessons: {} };
-                reportData[data.name].lessons[data.lesson] = data.status;
+window.renderDailyReport = async () => {
+    const date = document.getElementById('dailyDate').value;
+    const snap = await getDocs(collection(db, "attendance"));
+    
+    // 1. تجميع الغائبين والمجازين فقط
+    let absentees = {}; 
+    snap.forEach(d => {
+        let data = d.data();
+        if(data.date === date && data.status !== "حاضر") { // فلترة الحاضرين
+            if(!absentees[data.name]) {
+                absentees[data.name] = { 
+                    lessons: {}, 
+                    class: data.class, 
+                    section: data.section 
+                };
             }
-        });
-
-        let html = `<h4>تقرير يوم ${date}</h4>
-                    <table id="exportTable" class="report-table">
-                    <tr><th>الطالب</th><th>د1</th><th>د2</th><th>د3</th><th>د4</th><th>د5</th><th>د6</th></tr>`;
-        
-        for(let name in reportData) {
-            html += `<tr><td>${name}</td>`;
-            for(let i=1; i<=6; i++) {
-                html += `<td>${reportData[name].lessons['الدرس '+i] || ''}</td>`;
-            }
-            html += `</tr>`;
+            absentees[data.name].lessons[data.lesson] = data.status;
         }
-        
-        document.getElementById('res').innerHTML = html + `</table>
-        <button class="btn-export" onclick="exportExcel()">تصدير إلى Excel</button>`;
-    };
+    });
 
-    // دالة تصدير Excel
-    window.exportExcel = () => {
-        const wb = XLSX.utils.table_to_book(document.getElementById('exportTable'));
-        XLSX.writeFile(wb, "تقرير_الحضور.xlsx");
-    };
+    // 2. التحقق من وجود بيانات
+    if (Object.keys(absentees).length === 0) {
+        document.getElementById('res').innerHTML = "<p>لا يوجد غيابات أو إجازات مسجلة لهذا التاريخ.</p>";
+        return;
+    }
 
-    // ... (باقي الدوال الخاصة بك: clearAllData, fetchReports تبقى كما هي دون تغيير)
-</script>
-</body>
-</html>
+    // 3. رسم الجدول (للغائبين فقط)
+    let html = `<h3>تقرير يوم ${date} (الغياب والإجازات فقط)</h3>
+    <table id="myTable" class="report-table">
+        <tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>الدرس 1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr>`;
+    
+    for(let name in absentees) {
+        let s = absentees[name];
+        html += `<tr><td>${name}</td><td>${s.class}-${s.section}</td>`;
+        for(let i=1; i<=6; i++) {
+            html += `<td>${s.lessons['الدرس '+i] || '-'}</td>`;
+        }
+        html += `</tr>`;
+    }
+    document.getElementById('res').innerHTML = html + `</table><button onclick="exportExcel()">تصدير Excel</button>`;
+};

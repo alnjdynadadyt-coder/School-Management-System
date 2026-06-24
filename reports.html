@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تقارير الحضور</title>
+    <title>التقارير</title>
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -16,27 +16,34 @@
 <body>
 
 <div class="card">
-    <h4>📋 تقرير الغيابات اليومي</h4>
+    <h4>📋 التقرير اليومي</h4>
     <input type="date" id="dailyDate">
-    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none;">عرض تقرير اليوم</button>
+    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none; padding:10px; width:100%;">عرض تقرير اليوم</button>
 </div>
 
 <div class="card">
-    <h4>🔍 سجل الطالب المفصل</h4>
+    <h4>🔍 سجل الطالب (بحث يدوي أو قوائم)</h4>
+    <input type="text" id="manualName" placeholder="أدخل اسم الطالب يدوياً...">
     <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
     <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
     <select id="sStudent"><option value="">اختر الطالب...</option></select>
-    <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none;">استخراج السجل</button>
+    <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">استخراج السجل</button>
 </div>
 
 <div id="res" class="card"></div>
-<a href="attendance.html" style="display:block; text-align:center; margin:15px 0;">⬅️ العودة لتسجيل الحضور</a>
+<a href="index.html" style="display:block; text-align:center; margin:15px 0; color:#555;">⬅️ العودة للقائمة الرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* أضف الـ config */ }));
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        projectId: "school-manager-d1865",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
+
+    // تفعيل التاريخ تلقائياً
     document.getElementById('dailyDate').valueAsDate = new Date();
 
     let allStudents = [];
@@ -80,7 +87,8 @@
     };
 
     window.fetchStudentReport = async () => {
-        const name = document.getElementById('sStudent').value;
+        const name = document.getElementById('manualName').value || document.getElementById('sStudent').value;
+        if(!name) { alert("حدد الطالب أولاً!"); return; }
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         snap.forEach(d => {
@@ -90,7 +98,7 @@
                 report[data.date].items.push(`${data.lesson}: ${data.status}`);
             }
         });
-        document.getElementById('res').innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
+        document.getElementById('res').innerHTML = `<h4>سجل: ${name}</h4>`;
         for(let date in report) {
             document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong><small>(${report[date].class}-${report[date].sec})</small><div>${report[date].items.map(i => `<span class="tag ${i.includes('غائب')?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
         }

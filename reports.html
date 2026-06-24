@@ -17,7 +17,16 @@
 <body>
 
 <div class="card" style="border: 2px solid #dc3545;">
-    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">إعادة ضبط النظام (حذف جميع سجلات الحضور)</button>
+    <h4>⚠️ حذف سجلات مخصص</h4>
+    <div class="grid-row">
+        <input type="date" id="delFrom" title="من تاريخ">
+        <input type="date" id="delTo" title="إلى تاريخ">
+    </div>
+    <div class="grid-row">
+        <select id="delClass"><option value="">اختر الصف...</option></select>
+        <select id="delSection"><option value="">اختر الشعبة...</option></select>
+    </div>
+    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">تنفيذ الحذف المشروط</button>
 </div>
 
 <div class="card">

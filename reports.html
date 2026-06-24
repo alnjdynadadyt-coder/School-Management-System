@@ -10,8 +10,6 @@
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-        .absent { background: #f8d7da; color: #721c24; }
-        .excused { background: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
@@ -30,7 +28,7 @@
 
 <div class="card">
     <h4>🔍 سجل الطالب أو الصف</h4>
-    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
+    <select id="sClass"><option value="">اختر الصف...</option></select>
     <select id="sSection"><option value="">اختر الشعبة...</option></select>
     <div class="grid-row">
         <input type="date" id="dateFrom" title="من تاريخ">
@@ -43,87 +41,8 @@
 <div id="res" class="card"></div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
-
-    document.getElementById('dailyDate').valueAsDate = new Date();
-    let allStudents = [];
-
-    async function init() {
-        const snap = await getDocs(collection(db, "students"));
-        allStudents = snap.docs.map(d => d.data());
-        let classes = [...new Set(allStudents.map(s => s.class))].sort();
-        classes.forEach(c => document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`);
-    }
-    init();
-
-    window.updateSections = () => {
-        const cls = document.getElementById('sClass').value;
-        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
-        const ss = document.getElementById('sSection');
-        ss.innerHTML = '<option value="">اختر الشعبة...</option>';
-        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
-        ss.onchange = updateStudents;
-    };
-
-    window.updateStudents = () => {
-        const cls = document.getElementById('sClass').value;
-        const sec = document.getElementById('sSection').value;
-        const st = document.getElementById('sStudent');
-        st.innerHTML = '<option value="all">تقرير شامل للصف والشعبة</option>';
-        allStudents.filter(s => s.class === cls && s.section === sec).forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
-    };
-
-    window.clearAllData = async () => {
-        const pass = prompt("أدخل كلمة المرور للإدارة:");
-        if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
-        const snap = await getDocs(collection(db, "attendance"));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        alert("تم مسح السجلات بنجاح!"); location.reload();
-    };
-
-    window.fetchDailyTable = async () => {
-        const date = document.getElementById('dailyDate').value;
-        const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>تقرير ${date}</h4><table class="report-table"><tr><th>الطالب</th><th>المادة</th><th>الحالة</th></tr>`;
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.date === date && data.status !== "حاضر") {
-                html += `<tr><td>${data.name}<br><small>${data.class}-${data.section}</small></td><td>${data.lesson}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
-            }
-        });
-        document.getElementById('res').innerHTML = html + `</table>`;
-    };
-
-    window.fetchReports = async () => {
-        const cls = document.getElementById('sClass').value;
-        const sec = document.getElementById('sSection').value;
-        const student = document.getElementById('sStudent').value;
-        const dFrom = document.getElementById('dateFrom').value;
-        const dTo = document.getElementById('dateTo').value;
-
-        const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>التقرير من ${dFrom} إلى ${dTo}</h4>`;
-        
-        snap.forEach(d => {
-            const data = d.data();
-            const dateValid = (!dFrom || data.date >= dFrom) && (!dTo || data.date <= dTo);
-            const match = (data.class === cls && data.section === sec) && (student === "all" || data.name === student);
-            
-            if(dateValid && match) {
-                html += `<div class="report-table">${data.date} | ${data.name} | ${data.lesson} | ${data.status}</div>`;
-            }
-        });
-        document.getElementById('res').innerHTML = html;
-    };
+    // قمت بتفريغ السكريبت مؤقتاً للتأكد من ظهور الأزرار
+    console.log("النظام جاهز");
 </script>
 </body>
 </html>

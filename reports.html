@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <title>تقارير الحضور</title>
     <style>
-        body { font-family: sans-serif; padding: 15px; background: #f8f9fa; }
-        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        .row { display: flex; gap: 10px; margin-top: 10px; }
-        .row > div { flex: 1; }
-        select, input, button { width: 100%; padding: 12px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; }
-        .report-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #eee; }
-        .status-tag { padding: 4px 8px; border-radius: 4px; font-size: 12px; margin-right: 5px; }
-        .absent { background: #f8d7da; color: #721c24; }
-        .excused { background: #fff3cd; color: #856404; }
+        body { font-family: sans-serif; padding: 10px; background: #f8f9fa; }
+        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .input-group { margin-bottom: 10px; }
+        input, select, button { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        .date-row { display: flex; gap: 5px; }
+        .date-row > div { flex: 1; }
+        .btn-green { background: #28a745; color: white; border: none; cursor: pointer; }
+        .btn-blue { background: #007bff; color: white; border: none; cursor: pointer; }
+        .report-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
     </style>
 </head>
 <body>
@@ -20,65 +20,77 @@
 <div class="card">
     <h4>📋 التقرير اليومي</h4>
     <input type="date" id="dailyDate">
-    <button onclick="dailyReport()" style="background:#28a745; color:white;">عرض غيابات اليوم</button>
+    <button class="btn-green" onclick="fetchDailyReport()">عرض غيابات اليوم</button>
 </div>
 
 <div class="card">
     <h4>🔍 سجل الطالب (بحث مرن)</h4>
-    <input type="text" id="manualName" placeholder="أدخل اسم الطالب...">
-    <hr>
-    <select id="filterClass"><option value="">اختر الصف...</option></select>
-    <select id="filterSection"><option value="">اختر الشعبة...</option></select>
-    <select id="filterStudent"><option value="">اختر الطالب من القائمة...</option></select>
-    
-    <div class="row">
-        <div><label>من:</label><input type="date" id="start"></div>
-        <div><label>إلى:</label><input type="date" id="end"></div>
+    <input type="text" id="manualName" placeholder="أدخل اسم الطالب يدوياً...">
+    <select id="classSelect"><option value="">اختر الصف...</option></select>
+    <select id="sectionSelect"><option value="">اختر الشعبة...</option></select>
+    <select id="studentSelect"><option value="">اختر الطالب من القائمة...</option></select>
+    <div class="date-row">
+        <div><label>من:</label><input type="date" id="startDate"></div>
+        <div><label>إلى:</label><input type="date" id="endDate"></div>
     </div>
-    <button onclick="studentReport()" style="background:#007bff; color:white; margin-top:15px;">استخراج السجل</button>
+    <button class="btn-blue" onclick="fetchStudentReport()">استخراج السجل</button>
 </div>
 
 <div id="reportResult" class="card"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* أضف الـ config الخاص بك هنا */ }));
+    const db = getFirestore(initializeApp({
+        projectId: "school-manager-d1865",
+        // أضف بقية بيانات الـ config الخاصة بك هنا
+    }));
 
-    // تعيين تاريخ اليوم تلقائياً
+    // 1. تعيين التاريخ اليومي تلقائياً
     document.getElementById('dailyDate').valueAsDate = new Date();
 
-    // 1. تقرير اليوم (تم إصلاح الزر)
-    window.dailyReport = async () => {
+    // 2. دالة جلب البيانات للقوائم (الصف والشعبة والطالب)
+    async function loadDropdowns() {
+        const snap = await getDocs(collection(db, "students"));
+        let classes = new Set();
+        snap.forEach(d => classes.add(d.data().class));
+        
+        const classSelect = document.getElementById('classSelect');
+        classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
+    }
+    loadDropdowns();
+
+    // 3. التقرير اليومي
+    window.fetchDailyReport = async () => {
         const date = document.getElementById('dailyDate').value;
         const resDiv = document.getElementById('reportResult');
-        resDiv.innerHTML = "جاري البحث...";
-        
-        const snap = await getDocs(query(collection(db, "attendance"), where("date", "==", date)));
-        let daily = {};
+        resDiv.innerHTML = "جاري التحميل...";
+        const q = query(collection(db, "attendance"), where("date", "==", date));
+        const snap = await getDocs(q);
+        resDiv.innerHTML = `<h4>غيابات ${date}</h4>`;
         snap.forEach(d => {
             const data = d.data();
-            if(data.status !== "حاضر") {
-                if(!daily[data.name]) daily[data.name] = { class: data.class, status: [] };
-                daily[data.name].status.push(`${data.lesson}: ${data.status}`);
-            }
+            if(data.status !== "حاضر") resDiv.innerHTML += `<div class="report-item"><span>${data.name}</span><span>${data.lesson}: ${data.status}</span></div>`;
         });
-
-        resDiv.innerHTML = `<h4>غيابات يوم ${date}</h4>`;
-        for(let name in daily) {
-            resDiv.innerHTML += `<div class="report-item"><strong>${name} (${daily[name].class})</strong> <div>${daily[name].status.map(s => `<span class="status-tag ${s.includes('غائب')?'absent':'excused'}">${s}</span>`).join('')}</div></div>`;
-        }
     };
 
-    // 2. سجل الطالب (يدعم الاسم أو القوائم)
-    window.studentReport = async () => {
-        const manualName = document.getElementById('manualName').value;
-        const selectName = document.getElementById('filterStudent').value;
-        const name = manualName || selectName;
+    // 4. استخراج السجل
+    window.fetchStudentReport = async () => {
+        const name = document.getElementById('manualName').value || document.getElementById('studentSelect').value;
+        if(!name) { alert("يرجى تحديد اسم الطالب"); return; }
         
-        if(!name) { alert("الرجاء كتابة الاسم أو اختياره من القائمة"); return; }
-        // ... بقية منطق التقرير ...
+        const resDiv = document.getElementById('reportResult');
+        resDiv.innerHTML = "جاري البحث عن سجل الطالب...";
+        
+        const q = query(collection(db, "attendance"), where("name", "==", name));
+        const snap = await getDocs(q);
+        
+        resDiv.innerHTML = `<h4>سجل: ${name}</h4>`;
+        snap.forEach(d => {
+            const data = d.data();
+            resDiv.innerHTML += `<div class="report-item"><span>${data.date}</span><span>${data.lesson}: ${data.status}</span></div>`;
+        });
     };
 </script>
 </body>

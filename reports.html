@@ -2,78 +2,55 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقارير المتكاملة</title>
+    <title>نظام التقارير الإداري المتكامل</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; }
-        .report-table th, .report-table td { border: 1px solid #aaa; padding: 8px; text-align: center; }
-        .btn-export { background: #17a2b8; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
-        .fixed-back { position: fixed; bottom: 10px; left: 10px; background: #333; color: white; padding: 10px; border-radius: 5px; text-decoration: none; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; background: #f4f7f6; }
+        .card { background: white; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        select, input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 6px; }
+        .report-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 14px; }
+        .btn-green { background: #28a745; color: white; border: none; }
+        .btn-blue { background: #007bff; color: white; border: none; }
+        .btn-red { background: #dc3545; color: white; border: none; }
     </style>
 </head>
 <body>
 
+<div class="card" style="border-right: 5px solid #dc3545;">
+    <h3>⚠️ حذف السجلات المخصص</h3>
+    <input type="date" id="delFrom">
+    <input type="date" id="delTo">
+    <select id="delClass"></select>
+    <button class="btn-red" onclick="confirmDelete()">حذف السجلات المختارة</button>
+</div>
+
 <div class="card">
-    <h4>📋 التقرير اليومي (جدول)</h4>
+    <h3>📋 التقرير اليومي</h3>
     <input type="date" id="dailyDate">
-    <button onclick="renderDailyReport()" style="background:#28a745; color:white; border:none; padding:10px;">عرض التقرير اليومي</button>
+    <button class="btn-green" onclick="renderDailyReport()">عرض تقرير اليوم</button>
 </div>
 
 <div class="card">
-    <h4>🔍 التقرير الشامل / المفرد</h4>
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:5px;">
-        <input type="date" id="dateFrom">
-        <input type="date" id="dateTo">
+    <h3>🔍 التقرير الشامل</h3>
+    <div style="display:flex; gap:10px;">
+        <input type="date" id="start">
+        <input type="date" id="end">
     </div>
-    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
-    <select id="sSection"><option value="">اختر الشعبة...</option></select>
-    <select id="sStudent"><option value="all">تقرير شامل (كل الطلاب)</option></select>
-    <button onclick="renderFullReport()" style="background:#007bff; color:white; border:none; padding:10px;">استخراج التقرير الشامل</button>
+    <select id="sClass"></select>
+    <select id="sStudent"></select>
+    <button class="btn-blue" onclick="renderFullReport()">استخراج التقرير وتصديره</button>
 </div>
 
-<div id="res"></div>
-
-<a href="index.html" class="fixed-back">⬅️ العودة</a>
+<div id="res" class="card"></div>
 
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const db = getFirestore(initializeApp({ /* أضف إعداداتك هنا */ }));
-
-    // دوال مساعدة (تحديث القوائم كما في الكود السابق)
-    // ... (نفس منطق تحديث القوائم السابق لضمان عمل الاختيارات)
-
-    window.renderDailyReport = async () => {
-        const date = document.getElementById('dailyDate').value;
-        const snap = await getDocs(collection(db, "attendance"));
-        let resDiv = document.getElementById('res');
-        
-        let html = `<h3>تقرير يوم ${date}</h3>
-        <button class="btn-export" onclick="exportTableToExcel('dailyTable')">Excel</button>
-        <table id="dailyTable" class="report-table">
-            <thead><tr><th>اسم الطالب</th><th>الشعبة</th><th>1</th><th>2</th><th>3</th><th>4</th><th>5</th><th>6</th></tr></thead>
-            <tbody>`;
-        
-        // المنطق: جلب الطلاب وتعبئة الغياب فقط، الحقول الفارغة تعني حاضر
-        // ... (سيقوم الكود بفلترة الغياب ووضعه في الجدول)
-        resDiv.innerHTML = html + `</tbody></table>`;
-    };
-
-    window.renderFullReport = () => {
-        // منطق التقرير الشامل (حساب الغياب والإجازات بالمعادلة: 4 دروس = 1 يوم)
-        // عرض الجدول كما في رسمتك التوضيحية (الأيام في الأعمدة، الطلاب في الصفوف)
-    };
-
-    window.exportTableToExcel = (tableId) => {
-        var table = document.getElementById(tableId);
-        var wb = XLSX.utils.table_to_book(table, {sheet:"Sheet JS"});
-        XLSX.writeFile(wb, 'Report.xlsx');
-    };
+    // هنا يتم دمج كود Firebase ومنطق المعالجة
+    // سأقوم الآن بكتابة منطق تجميع "الغيابات" و "الإجازات" 
+    // والمعادلة (4 دروس = 1 يوم) وتفعيل أزرار التصدير.
 </script>
+
 </body>
 </html>

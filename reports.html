@@ -7,8 +7,8 @@
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .report-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .tag { padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-right: 3px; }
+        .report-item { padding: 10px; border-bottom: 1px solid #eee; }
+        .tag { padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-right: 3px; display: inline-block; }
         .absent { background: #f8d7da; color: #721c24; }
         .excused { background: #fff3cd; color: #856404; }
     </style>
@@ -22,11 +22,14 @@
 </div>
 
 <div class="card">
-    <h4>🔍 سجل الطالب (بحث يدوي أو قوائم)</h4>
+    <h4>🔍 سجل الطالب</h4>
     <input type="text" id="manualName" placeholder="أدخل اسم الطالب يدوياً...">
     <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
     <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
     <select id="sStudent"><option value="">اختر الطالب...</option></select>
+    <div style="display:flex; gap:5px;">
+        <input type="date" id="startDate"><input type="date" id="endDate">
+    </div>
     <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">استخراج السجل</button>
 </div>
 
@@ -37,36 +40,36 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
-
-    // تفعيل التاريخ تلقائياً
+    const db = getFirestore(initializeApp({ /* أضف الـ config */ }));
     document.getElementById('dailyDate').valueAsDate = new Date();
 
     let allStudents = [];
     async function init() {
         const snap = await getDocs(collection(db, "students"));
+        allStudents = []; 
         snap.forEach(d => allStudents.push(d.data()));
-        let classes = [...new Set(allStudents.map(s => s.class))];
-        classes.forEach(c => document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`);
+        // تحديث القوائم لتشمل كل شيء
+        let classes = [...new Set(allStudents.map(s => s.class))].sort();
+        const sc = document.getElementById('sClass');
+        sc.innerHTML = '<option value="">اختر الصف...</option>';
+        classes.forEach(c => sc.innerHTML += `<option value="${c}">${c}</option>`);
     }
     
     window.updateSections = () => {
         const cls = document.getElementById('sClass').value;
-        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))];
-        document.getElementById('sSection').innerHTML = '<option value="">اختر الشعبة...</option>';
-        secs.forEach(s => document.getElementById('sSection').innerHTML += `<option value="${s}">${s}</option>`);
+        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
+        const ss = document.getElementById('sSection');
+        ss.innerHTML = '<option value="">اختر الشعبة...</option>';
+        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
     };
 
     window.updateStudents = () => {
         const cls = document.getElementById('sClass').value;
         const sec = document.getElementById('sSection').value;
         const students = allStudents.filter(s => s.class === cls && s.section === sec);
-        document.getElementById('sStudent').innerHTML = '<option value="">اختر الطالب...</option>';
-        students.forEach(s => document.getElementById('sStudent').innerHTML += `<option value="${s.name}">${s.name}</option>`);
+        const st = document.getElementById('sStudent');
+        st.innerHTML = '<option value="">اختر الطالب...</option>';
+        students.forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
     };
 
     window.fetchDaily = async () => {
@@ -76,31 +79,33 @@
         snap.forEach(d => {
             const data = d.data();
             if(data.date === date && data.status !== "حاضر") {
-                if(!daily[data.name]) daily[data.name] = { class: data.class, status: [] };
+                if(!daily[data.name]) daily[data.name] = { class: data.class, sec: data.section || 'N/A', status: [] };
                 daily[data.name].status.push(`${data.lesson}: ${data.status}`);
             }
         });
         document.getElementById('res').innerHTML = `<h4>غيابات ${date}</h4>`;
         for(let name in daily) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${name} (${daily[name].class})</strong> <div>${daily[name].status.map(s => `<span class="tag ${s.includes('غائب')?'absent':'excused'}">${s}</span>`).join('')}</div></div>`;
+            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${name} (${daily[name].class} - ${daily[name].sec})</strong> <div>${daily[name].status.map(s => `<span class="tag ${s.includes('غائب')?'absent':'excused'}">${s}</span>`).join('')}</div></div>`;
         }
     };
 
     window.fetchStudentReport = async () => {
         const name = document.getElementById('manualName').value || document.getElementById('sStudent').value;
-        if(!name) { alert("حدد الطالب أولاً!"); return; }
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         snap.forEach(d => {
             const data = d.data();
-            if(data.name === name && data.status !== "حاضر") {
-                if(!report[data.date]) report[data.date] = { class: data.class, sec: data.section, items: [] };
+            // فلترة بالاسم والتاريخ
+            if(data.name === name && data.status !== "حاضر" && (!start || data.date >= start) && (!end || data.date <= end)) {
+                if(!report[data.date]) report[data.date] = { class: data.class, sec: data.section || 'N/A', items: [] };
                 report[data.date].items.push(`${data.lesson}: ${data.status}`);
             }
         });
-        document.getElementById('res').innerHTML = `<h4>سجل: ${name}</h4>`;
+        document.getElementById('res').innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
         for(let date in report) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong><small>(${report[date].class}-${report[date].sec})</small><div>${report[date].items.map(i => `<span class="tag ${i.includes('غائب')?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
+            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong> <div><small>(${report[date].class}-${report[date].sec})</small> ${report[date].items.map(i => `<span class="tag ${i.includes('غائب')?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
         }
     };
     init();

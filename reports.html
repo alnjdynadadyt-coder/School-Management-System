@@ -61,7 +61,11 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    document.getElementById('dailyDate').valueAsDate = new Date();
+    const today = new Date();
+const offset = today.getTimezoneOffset();
+const localDate = new Date(today.getTime() - (offset * 60 * 1000));
+document.getElementById('dailyDate').value = localDate.toISOString().split('T')[0];
+
     let allStudents = [];
 
     async function init() {

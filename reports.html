@@ -9,18 +9,21 @@
         .grid-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
         .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
+        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 13px; }
         .absent { background: #f8d7da; color: #721c24; }
         .excused { background: #fff3cd; color: #856404; }
+        .btn-back { background: #6c757d; color: white; border: none; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
+<button class="btn-back" onclick="window.location.href='index.html'">⬅ العودة للرئيسية</button>
+
 <div class="card" style="border: 2px solid #dc3545;">
     <h4>⚠️ حذف سجلات مخصص</h4>
     <div class="grid-row">
-        <input type="date" id="delFrom" title="من تاريخ">
-        <input type="date" id="delTo" title="إلى تاريخ">
+        <input type="date" id="delFrom">
+        <input type="date" id="delTo">
     </div>
     <div class="grid-row">
         <select id="delClass"><option value="">اختر الصف...</option></select>
@@ -30,7 +33,7 @@
 </div>
 
 <div class="card">
-    <h4>📋 التقرير اليومي (جدول مخصص)</h4>
+    <h4>📋 التقرير اليومي</h4>
     <div class="grid-row">
         <input type="date" id="dailyDate">
         <button onclick="fetchDailyTable()" style="background:#28a745; color:white; border:none;">عرض تقرير اليوم</button>
@@ -42,8 +45,8 @@
     <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
     <select id="sSection"><option value="">اختر الشعبة...</option></select>
     <div class="grid-row">
-        <input type="date" id="dateFrom" title="من تاريخ">
-        <input type="date" id="dateTo" title="إلى تاريخ">
+        <input type="date" id="dateFrom">
+        <input type="date" id="dateTo">
     </div>
     <select id="sStudent"><option value="all">تقرير شامل للصف والشعبة</option></select>
     <button onclick="fetchReports()" style="background:#007bff; color:white; border:none;">استخراج التقرير</button>
@@ -53,7 +56,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
@@ -61,24 +64,21 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
+    // ضبط التاريخ الافتراضي
     const today = new Date();
-const offset = today.getTimezoneOffset();
-const localDate = new Date(today.getTime() - (offset * 60 * 1000));
-document.getElementById('dailyDate').value = localDate.toISOString().split('T')[0];
+    document.getElementById('dailyDate').value = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
 
     let allStudents = [];
 
     async function init() {
-    const snap = await getDocs(collection(db, "students"));
-    allStudents = snap.docs.map(d => d.data());
-    let classes = [...new Set(allStudents.map(s => s.class))].sort();
-    
-    classes.forEach(c => {
-        document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`;
-        document.getElementById('delClass').innerHTML += `<option value="${c}">${c}</option>`;
-    });
-}
-
+        const snap = await getDocs(collection(db, "students"));
+        allStudents = snap.docs.map(d => d.data());
+        let classes = [...new Set(allStudents.map(s => s.class))].sort();
+        classes.forEach(c => {
+            document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`;
+            document.getElementById('delClass').innerHTML += `<option value="${c}">${c}</option>`;
+        });
+    }
     init();
 
     window.updateSections = () => {
@@ -89,13 +89,14 @@ document.getElementById('dailyDate').value = localDate.toISOString().split('T')[
         secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
         ss.onchange = updateStudents;
     };
-document.getElementById('delClass').onchange = () => {
-    const cls = document.getElementById('delClass').value;
-    const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
-    const ds = document.getElementById('delSection');
-    ds.innerHTML = '<option value="">الشعبة...</option>';
-    secs.forEach(s => ds.innerHTML += `<option value="${s}">${s}</option>`);
-};
+
+    document.getElementById('delClass').onchange = () => {
+        const cls = document.getElementById('delClass').value;
+        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
+        const ds = document.getElementById('delSection');
+        ds.innerHTML = '<option value="">الشعبة...</option>';
+        secs.forEach(s => ds.innerHTML += `<option value="${s}">${s}</option>`);
+    };
 
     window.updateStudents = () => {
         const cls = document.getElementById('sClass').value;
@@ -106,43 +107,25 @@ document.getElementById('delClass').onchange = () => {
     };
 
     window.clearAllData = async () => {
-    const pass = prompt("أدخل كلمة المرور للإدارة:");
-    if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
-
-    const from = document.getElementById('delFrom').value;
-    const to = document.getElementById('delTo').value;
-    const cls = document.getElementById('delClass').value;
-    const sec = document.getElementById('delSection').value;
-
-    if(!from || !to || !cls || !sec) { 
-        alert("يرجى اختيار التاريخ (من وإلى) والصف والشعبة أولاً!"); 
-        return; 
-    }
-
-    const snap = await getDocs(collection(db, "attendance"));
-    const batch = writeBatch(db);
-    let count = 0;
-
-    snap.forEach(d => {
-        const data = d.data();
-        // التحقق من أن السجل يطابق التاريخ والصف والشعبة
-        if(data.date >= from && data.date <= to && data.class === cls && data.section === sec) {
-            batch.delete(d.ref);
-            count++;
-        }
-    });
-
-    if(count > 0) {
-        if(confirm(`تم العثور على ${count} سجل. هل أنت متأكد من حذفها؟`)) {
+        const pass = prompt("أدخل كلمة المرور:");
+        if (pass !== "1234") return alert("كلمة مرور خاطئة!");
+        const from = document.getElementById('delFrom').value, to = document.getElementById('delTo').value;
+        const cls = document.getElementById('delClass').value, sec = document.getElementById('delSection').value;
+        if(!from || !to || !cls || !sec) return alert("يرجى ملء جميع الحقول!");
+        const snap = await getDocs(collection(db, "attendance"));
+        const batch = writeBatch(db);
+        let count = 0;
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.date >= from && data.date <= to && data.class.trim() === cls.trim() && data.section.trim() === sec.trim()) {
+                batch.delete(d.ref); count++;
+            }
+        });
+        if(count > 0 && confirm(`سيتم حذف ${count} سجل. هل أنت متأكد؟`)) {
             await batch.commit();
-            alert("تم حذف " + count + " سجل بنجاح!");
-            location.reload();
-        }
-    } else {
-        alert("لا توجد سجلات تطابق هذه المعايير.");
-    }
-};
-
+            alert("تم الحذف بنجاح!"); location.reload();
+        } else { alert("لا توجد سجلات مطابقة."); }
+    };
 
     window.fetchDailyTable = async () => {
         const date = document.getElementById('dailyDate').value;
@@ -150,33 +133,26 @@ document.getElementById('delClass').onchange = () => {
         let html = `<h4>تقرير ${date}</h4><table class="report-table"><tr><th>الطالب</th><th>المادة</th><th>الحالة</th></tr>`;
         snap.forEach(d => {
             const data = d.data();
-            if(data.date === date && data.status !== "حاضر") {
-                html += `<tr><td>${data.name}<br><small>${data.class}-${data.section}</small></td><td>${data.lesson}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
+            if(data.date === date) {
+                html += `<tr><td>${data.name}<br><small>${data.class}-${data.section}</small></td><td>${data.lesson||''}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
             }
         });
         document.getElementById('res').innerHTML = html + `</table>`;
     };
 
     window.fetchReports = async () => {
-        const cls = document.getElementById('sClass').value;
-        const sec = document.getElementById('sSection').value;
-        const student = document.getElementById('sStudent').value;
-        const dFrom = document.getElementById('dateFrom').value;
-        const dTo = document.getElementById('dateTo').value;
-
+        const cls = document.getElementById('sClass').value, sec = document.getElementById('sSection').value;
+        const student = document.getElementById('sStudent').value, dFrom = document.getElementById('dateFrom').value, dTo = document.getElementById('dateTo').value;
         const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>التقرير من ${dFrom} إلى ${dTo}</h4>`;
-        
+        let html = `<h4>التقرير من ${dFrom} إلى ${dTo}</h4><table class="report-table"><tr><th>التاريخ</th><th>الطالب</th><th>المادة</th><th>الحالة</th></tr>`;
         snap.forEach(d => {
             const data = d.data();
-            const dateValid = (!dFrom || data.date >= dFrom) && (!dTo || data.date <= dTo);
-            const match = (data.class === cls && data.section === sec) && (student === "all" || data.name === student);
-            
-            if(dateValid && match) {
-                html += `<div class="report-table">${data.date} | ${data.name} | ${data.lesson} | ${data.status}</div>`;
+            const match = (data.class.trim() === cls.trim() && data.section.trim() === sec.trim()) && (student === "all" || data.name === student);
+            if(match && (!dFrom || data.date >= dFrom) && (!dTo || data.date <= dTo)) {
+                html += `<tr><td>${data.date}</td><td>${data.name}</td><td>${data.lesson||''}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
             }
         });
-        document.getElementById('res').innerHTML = html;
+        document.getElementById('res').innerHTML = html + `</table>`;
     };
 </script>
 </body>

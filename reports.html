@@ -21,6 +21,12 @@
 </div>
 
 <div class="card">
+    <h4>📋 التقرير اليومي</h4>
+    <input type="date" id="dailyDate">
+    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none; padding:10px;">عرض تقرير اليوم</button>
+</div>
+
+<div class="card">
     <h4>🔍 سجل الطالب المفصل</h4>
     <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
     <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
@@ -29,6 +35,7 @@
 </div>
 
 <div id="res" class="card"></div>
+<a href="index.html" style="display:block; text-align:center; margin:15px 0; color:#555;">⬅️ العودة للقائمة الرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -40,53 +47,83 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    // دالة الحذف
+    document.getElementById('dailyDate').valueAsDate = new Date();
+    let allStudents = [];
+
+    async function init() {
+        const snap = await getDocs(collection(db, "students"));
+        allStudents = snap.docs.map(d => d.data());
+        let classes = [...new Set(allStudents.map(s => s.class))].sort();
+        const sc = document.getElementById('sClass');
+        classes.forEach(c => sc.innerHTML += `<option value="${c}">${c}</option>`);
+    }
+    init();
+
+    window.updateSections = () => {
+        const cls = document.getElementById('sClass').value;
+        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
+        const ss = document.getElementById('sSection');
+        ss.innerHTML = '<option value="">اختر الشعبة...</option>';
+        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
+    };
+
+    window.updateStudents = () => {
+        const cls = document.getElementById('sClass').value;
+        const sec = document.getElementById('sSection').value;
+        const students = allStudents.filter(s => s.class === cls && s.section === sec);
+        const st = document.getElementById('sStudent');
+        st.innerHTML = '<option value="">اختر الطالب...</option>';
+        students.forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
+    };
+
     window.clearAllData = async () => {
-        if(!confirm("⚠️ سيتم حذف جميع السجلات. هل أنت متأكد؟")) return;
+        if(!confirm("⚠️ تحذير: سيتم حذف جميع سجلات الحضور. هل أنت متأكد؟")) return;
         const snap = await getDocs(collection(db, "attendance"));
         snap.forEach(async (d) => await deleteDoc(doc(db, "attendance", d.id)));
         alert("تم الحذف!"); location.reload();
     };
 
-    // دالة استخراج السجل مع المعادلة
+    window.fetchDaily = async () => {
+        const date = document.getElementById('dailyDate').value;
+        const snap = await getDocs(collection(db, "attendance"));
+        document.getElementById('res').innerHTML = `<h4>غيابات ${date}</h4>`;
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.date === date && data.status !== "حاضر") {
+                document.getElementById('res').innerHTML += `<div class="report-item"><strong>${data.name}</strong><span class="tag absent">${data.lesson}: ${data.status}</span></div>`;
+            }
+        });
+    };
+
     window.fetchStudentReport = async () => {
         const name = document.getElementById('sStudent').value;
-        if(!name) { alert("اختر الطالب أولاً!"); return; }
-        
+        if(!name) { alert("حدد الطالب!"); return; }
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
-        
         snap.forEach(d => {
             const data = d.data();
             if(data.name === name) {
-                if(!report[data.date]) report[data.date] = { class: data.class, sec: data.section, items: [] };
+                if(!report[data.date]) report[data.date] = { items: [] };
                 report[data.date].items.push(data.status);
             }
         });
 
-        // المعادلة الذكية:
-        let fullDaysAbsent = 0, partialAbsent = 0, fullDaysExcused = 0, partialExcused = 0;
-        for(let date in report) {
-            let absentCount = report[date].items.filter(i => i === "غائب").length;
-            let excusedCount = report[date].items.filter(i => i === "مجاز").length;
-            
-            if(absentCount >= 4) fullDaysAbsent++; else partialAbsent += absentCount;
-            if(excusedCount >= 4) fullDaysExcused++; else partialExcused += excusedCount;
+        let fullAbsent = 0, partAbsent = 0, fullExcused = 0, partExcused = 0;
+        for(let d in report) {
+            let a = report[d].items.filter(i => i === "غائب").length;
+            let e = report[d].items.filter(i => i === "مجاز").length;
+            if(a >= 4) fullAbsent++; else partAbsent += a;
+            if(e >= 4) fullExcused++; else partExcused += e;
         }
 
         document.getElementById('res').innerHTML = `
-            <div class="summary-box">
-                <strong>الخلاصة لـ ${name}:</strong><br>
-                أيام الغياب: ${(fullDaysAbsent + (partialAbsent/4)).toFixed(1)} يوم<br>
-                أيام الإجازات: ${(fullDaysExcused + (partialExcused/4)).toFixed(1)} يوم
-            </div>`;
-            
+            <div class="summary-box"><strong>الخلاصة لـ ${name}:</strong><br>
+            أيام الغياب: ${(fullAbsent + (partAbsent/4)).toFixed(1)} يوم<br>
+            أيام الإجازات: ${(fullExcused + (partExcused/4)).toFixed(1)} يوم</div>`;
         for(let date in report) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong> <div>${report[date].items.map(i => `<span class="tag ${i==='غائب'?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
+            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong><div>${report[date].items.map(i => `<span class="tag ${i==='غائب'?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
         }
     };
-    
-    // تأكد من ربط دوال الـ init و update لاختيار الطلاب هنا
 </script>
 </body>
 </html>

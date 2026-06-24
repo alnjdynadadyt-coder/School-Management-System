@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقارير</title>
+    <title>التقارير الموحدة</title>
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
@@ -88,7 +88,7 @@
         });
         document.getElementById('res').innerHTML = `<h4>غيابات ${date}</h4>`;
         for(let name in daily) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${name} (${daily[name].class} ${daily[name].sec})</strong> <div>${daily[name].status.map(s => `<span class="tag ${s.includes('غائب')?'absent':'excused'}">${s}</span>`).join('')}</div></div>`;
+            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${name} <small>(${daily[name].class} - ${daily[name].sec})</small></strong> <div>${daily[name].status.map(s => `<span class="tag ${s.includes('غائب')?'absent':'excused'}">${s}</span>`).join('')}</div></div>`;
         }
     };
 
@@ -106,9 +106,9 @@
                 report[data.date].items.push(`${data.lesson}: ${data.status}`);
             }
         });
-        document.getElementById('res').innerHTML = `<h4>سجل: ${name}</h4>`;
+        document.getElementById('res').innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
         for(let date in report) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong> <div><small>(${report[date].class} ${report[date].sec})</small> ${report[date].items.map(i => `<span class="tag ${i.includes('غائب')?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
+            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong> <div><small>(${report[date].class} - ${report[date].sec})</small> ${report[date].items.map(i => `<span class="tag ${i.includes('غائب')?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
         }
     };
     init();

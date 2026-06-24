@@ -2,33 +2,32 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تقارير الحضور</title>
+    <title>تقارير الحضور المتقدمة</title>
     <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        input, button { width: 100%; padding: 12px; margin: 5px 0; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
-        .report-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .absent { color: #721c24; font-weight: bold; }
-        .excused { color: #856404; font-weight: bold; }
-        h4 { margin-top: 0; color: #333; }
+        body { font-family: sans-serif; padding: 15px; background: #f8f9fa; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .row { display: flex; gap: 10px; }
+        input, button { width: 100%; padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 5px; }
+        .report-day { border-bottom: 1px solid #eee; padding: 10px 0; }
+        .status-tag { padding: 3px 8px; border-radius: 4px; font-size: 12px; margin-right: 5px; }
+        .absent { background: #f8d7da; color: #721c24; }
+        .excused { background: #fff3cd; color: #856404; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h4>📋 كشف الغيابات اليومي</h4>
-    <input type="date" id="reportDate">
-    <button onclick="dailyReport()" style="background:#28a745; color:white; border:none; cursor:pointer;">عرض غيابات هذا اليوم</button>
-</div>
-
-<div class="card">
-    <h4>🔍 سجل طالب محدد</h4>
-    <input type="text" id="studentName" placeholder="اكتب اسم الطالب بالكامل...">
-    <button onclick="studentReport()" style="background:#007bff; color:white; border:none; cursor:pointer;">عرض سجل الطالب</button>
+    <h4>🔍 سجل غيابات الطالب</h4>
+    <input type="text" id="studentName" placeholder="اسم الطالب بالكامل...">
+    <div class="row">
+        <div><label>من:</label><input type="date" id="startDate"></div>
+        <div><label>إلى:</label><input type="date" id="endDate"></div>
+    </div>
+    <button onclick="getStudentReport()" style="background:#007bff; color:white; border:none; margin-top:10px;">استخراج السجل</button>
 </div>
 
 <div id="reportResult" class="card"></div>
-<a href="index.html" style="display:block; text-align:center; margin-top:20px; color:#555;">⬅️ العودة للرئيسية</a>
+<a href="index.html" style="display:block; text-align:center;">العودة للرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -40,46 +39,43 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    // التقرير اليومي: يجلب كل من غاب أو كان مجازاً في يوم محدد
-    window.dailyReport = async () => {
-        const date = document.getElementById('reportDate').value;
-        const resDiv = document.getElementById('reportResult');
-        resDiv.innerHTML = "جاري البحث...";
-        
-        const q = query(collection(db, "attendance"), where("date", "==", date));
-        const snap = await getDocs(q);
-        
-        resDiv.innerHTML = `<h4>تقرير الغيابات ليوم ${date}</h4>`;
-        let found = false;
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.status !== "حاضر") {
-                found = true;
-                resDiv.innerHTML += `<div class="report-item"><span>${data.name} (${data.class})</span> <span class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status} - ${data.lesson}</span></div>`;
-            }
-        });
-        if (!found) resDiv.innerHTML += "لا يوجد غيابات مسجلة لهذا اليوم.";
-    };
-
-    // سجل الطالب: يجلب كل غيابات الطالب بناءً على اسمه
-    window.studentReport = async () => {
+    window.getStudentReport = async () => {
         const name = document.getElementById('studentName').value;
+        const start = document.getElementById('startDate').value;
+        const end = document.getElementById('endDate').value;
         const resDiv = document.getElementById('reportResult');
-        resDiv.innerHTML = "جاري البحث...";
         
+        resDiv.innerHTML = "جاري تجميع البيانات...";
+
         const q = query(collection(db, "attendance"), where("name", "==", name));
         const snap = await getDocs(q);
         
-        resDiv.innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
-        let found = false;
+        let reportData = {};
         snap.forEach(d => {
             const data = d.data();
-            if(data.status !== "حاضر") {
-                found = true;
-                resDiv.innerHTML += `<div class="report-item"><span>${data.date}</span> <span>${data.lesson} | <span class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</span></span></div>`;
+            // الفلترة بالتاريخ
+            if ((!start || data.date >= start) && (!end || data.date <= end)) {
+                if(data.status !== "حاضر") {
+                    if(!reportData[data.date]) reportData[data.date] = [];
+                    reportData[data.date].push(`${data.lesson}: ${data.status}`);
+                }
             }
         });
-        if (!found) resDiv.innerHTML += "لا توجد غيابات مسجلة لهذا الطالب.";
+
+        resDiv.innerHTML = `<h4>سجل الطالب: ${name}</h4>`;
+        const sortedDates = Object.keys(reportData).sort();
+        
+        if (sortedDates.length === 0) {
+            resDiv.innerHTML += "<p>لا توجد سجلات غياب في هذه الفترة.</p>";
+        } else {
+            sortedDates.forEach(date => {
+                resDiv.innerHTML += `
+                    <div class="report-day">
+                        <strong>التاريخ: ${date}</strong><br>
+                        ${reportData[date].map(item => `<span class="status-tag ${item.includes('غائب') ? 'absent' : 'excused'}">${item}</span>`).join(' ')}
+                    </div>`;
+            });
+        }
     };
 </script>
 </body>

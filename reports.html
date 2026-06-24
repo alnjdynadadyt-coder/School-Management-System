@@ -17,16 +17,7 @@
 <body>
 
 <div class="card" style="border: 2px solid #dc3545;">
-    <h4>⚠️ حذف سجلات مخصص</h4>
-    <div class="grid-row">
-        <input type="date" id="delFrom" title="من تاريخ">
-        <input type="date" id="delTo" title="إلى تاريخ">
-    </div>
-    <div class="grid-row">
-        <select id="delClass"><option value="">الصف...</option></select>
-        <select id="delSection"><option value="">الشعبة...</option></select>
-    </div>
-    <button onclick="advancedDelete()" style="background:#dc3545; color:white; border:none; padding:10px;">تنفيذ الحذف المشروط</button>
+    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">إعادة ضبط النظام (حذف جميع سجلات الحضور)</button>
 </div>
 
 <div class="card">
@@ -53,7 +44,7 @@
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, deleteDoc, doc, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
@@ -68,25 +59,16 @@
         const snap = await getDocs(collection(db, "students"));
         allStudents = snap.docs.map(d => d.data());
         let classes = [...new Set(allStudents.map(s => s.class))].sort();
-        classes.forEach(c => {
-            document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`;
-            document.getElementById('delClass').innerHTML += `<option value="${c}">${c}</option>`;
-        });
+        classes.forEach(c => document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`);
     }
     init();
-
-    document.getElementById('delClass').onchange = () => {
-        const cls = document.getElementById('delClass').value;
-        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
-        document.getElementById('delSection').innerHTML = '<option value="">الشعبة...</option>' + secs.map(s => `<option value="${s}">${s}</option>`).join('');
-    };
 
     window.updateSections = () => {
         const cls = document.getElementById('sClass').value;
         const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
         const ss = document.getElementById('sSection');
         ss.innerHTML = '<option value="">اختر الشعبة...</option>';
-        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>');
+        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
         ss.onchange = updateStudents;
     };
 
@@ -98,29 +80,14 @@
         allStudents.filter(s => s.class === cls && s.section === sec).forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
     };
 
-    window.advancedDelete = async () => {
+    window.clearAllData = async () => {
         const pass = prompt("أدخل كلمة المرور للإدارة:");
         if (pass !== "1234") { alert("كلمة مرور خاطئة!"); return; }
-        
-        const from = document.getElementById('delFrom').value;
-        const to = document.getElementById('delTo').value;
-        const cls = document.getElementById('delClass').value;
-        const sec = document.getElementById('delSection').value;
-
-        if(!from || !to || !cls || !sec) { alert("يجب اختيار التاريخ والصف والشعبة!"); return; }
-
         const snap = await getDocs(collection(db, "attendance"));
         const batch = writeBatch(db);
-        let count = 0;
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.date >= from && data.date <= to && data.class === cls && data.section === sec) {
-                batch.delete(d.ref); count++;
-            }
-        });
-        if(count > 0 && confirm(`سيتم حذف ${count} سجل. هل أنت متأكد؟`)) {
-            await batch.commit(); alert("تم الحذف!"); location.reload();
-        } else { alert("لا توجد سجلات تطابق هذه المعايير."); }
+        snap.forEach(d => batch.delete(d.ref));
+        await batch.commit();
+        alert("تم مسح السجلات بنجاح!"); location.reload();
     };
 
     window.fetchDailyTable = async () => {

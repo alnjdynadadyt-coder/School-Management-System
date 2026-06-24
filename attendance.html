@@ -6,44 +6,28 @@
     <style>
         body { font-family: sans-serif; padding: 15px; background: #f0f2f5; }
         .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
-        select, input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; }
-        button { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
-        .back-link { display: block; text-align: center; margin-top: 15px; color: #555; text-decoration: none; }
-        .student-row { background: #fff; padding: 10px; margin-top: 5px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .student-row { background: #fff; padding: 12px; margin-top: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .btn-action { padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin: 0 2px; }
+        .present { background: #d4edda; }
+        .absent { background: #f8d7da; }
+        .excused { background: #fff3cd; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>بيانات الدرس</h3>
+    <h3>تسجيل الغياب</h3>
     <input type="date" id="date">
-    <select id="subject">
-        <option>الاسلامية</option><option>العربي</option><option>الانكليزي</option><option>الرياضيات</option>
-        <option>الفيزياء</option><option>الكيمياء</option><option>الاحياء</option><option>الحاسوب</option>
-        <option>الجغرافية</option><option>التاريخ</option><option>الاجتماع</option><option>الفلسفة</option>
-        <option>الاقتصاد</option><option>الجرائم</option><option>الرياضة</option><option>الفنية</option><option>أخرى</option>
-    </select>
-    <select id="lesson">
-        <option>الدرس الأول</option><option>الثاني</option><option>الثالث</option>
-        <option>الرابع</option><option>الخامس</option><option>السادس</option><option>السابع</option>
-    </select>
-    <select id="fClass">
-        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-        <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
-    </select>
-    <select id="fSection">
-        <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option>
-    </select>
-    
-    <button onclick="fetchStudents()">جلب قائمة الطلاب</button>
-    <a href="index.html" class="back-link">⬅️ العودة للرئيسية</a>
+    <select id="fClass"><option>الرابع العلمي</option><option>السادس العلمي</option></select>
+    <select id="fSection"><option>أ</option><option>ب</option></select>
+    <button onclick="fetchStudents()" style="width:100%; padding:10px; background:#007bff; color:white; border:none;">جلب القائمة</button>
 </div>
 
 <div id="studentList" class="card"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
@@ -54,21 +38,31 @@
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    document.getElementById('date').valueAsDate = new Date();
-    
+    window.saveAttendance = async (studentName, status) => {
+        const date = document.getElementById('date').value;
+        const sClass = document.getElementById('fClass').value;
+        // حفظ الحضور في قاعدة البيانات
+        await setDoc(doc(db, "attendance", `${date}_${studentName}`), {
+            name: studentName, status: status, date: date, class: sClass
+        });
+        alert("تم تسجيل: " + status);
+    };
+
     window.fetchStudents = async () => {
         const sClass = document.getElementById('fClass').value;
         const sSection = document.getElementById('fSection').value;
-        const listDiv = document.getElementById('studentList');
-        listDiv.innerHTML = "جاري التحميل...";
-
         const q = query(collection(db, "students"), where("class", "==", sClass), where("section", "==", sSection));
-        const querySnapshot = await getDocs(q);
-        
+        const snap = await getDocs(q);
+        const listDiv = document.getElementById('studentList');
         listDiv.innerHTML = "";
-        querySnapshot.forEach((doc) => {
-            const student = doc.data();
-            listDiv.innerHTML += `<div class="student-row">${student.name} <span>[حاضر] [غائب] [مجاز]</span></div>`;
+        snap.forEach(d => {
+            const name = d.data().name;
+            listDiv.innerHTML += `<div class="student-row">${name} 
+                <div>
+                    <button class="btn-action present" onclick="saveAttendance('${name}', 'حاضر')">حاضر</button>
+                    <button class="btn-action absent" onclick="saveAttendance('${name}', 'غائب')">غائب</button>
+                    <button class="btn-action excused" onclick="saveAttendance('${name}', 'مجاز')">مجاز</button>
+                </div></div>`;
         });
     };
 </script>

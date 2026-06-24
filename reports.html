@@ -1,129 +1,44 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقارير المتكاملة</title>
-    <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .report-item { padding: 10px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .tag { padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-right: 3px; }
-        .summary-box { background: #d1ecf1; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-right: 5px solid #0c5460; }
-        .absent { background: #f8d7da; color: #721c24; }
-        .excused { background: #fff3cd; color: #856404; }
-    </style>
-</head>
-<body>
-
-<div class="card" style="border: 1px solid #dc3545;">
-    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none; padding:10px;">إعادة ضبط النظام (حذف سجلات الحضور)</button>
-</div>
-
-<div class="card">
-    <h4>📋 التقرير اليومي</h4>
-    <input type="date" id="dailyDate">
-    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none; padding:10px;">عرض تقرير اليوم</button>
-</div>
-
-<div class="card">
-    <h4>🔍 سجل الطالب المفصل</h4>
-    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
-    <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
-    <select id="sStudent"><option value="">اختر الطالب...</option></select>
-    <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">استخراج السجل مع الخلاصة</button>
-</div>
-
-<div id="res" class="card"></div>
-<a href="index.html" style="display:block; text-align:center; margin:15px 0; color:#555;">⬅️ العودة للقائمة الرئيسية</a>
-
 <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    // ... (نفس إعدادات الاستيراد والاتصال بـ db السابقة) ...
 
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
-
-    document.getElementById('dailyDate').valueAsDate = new Date();
-    let allStudents = [];
-
-    async function init() {
-        const snap = await getDocs(collection(db, "students"));
-        allStudents = snap.docs.map(d => d.data());
-        let classes = [...new Set(allStudents.map(s => s.class))].sort();
-        const sc = document.getElementById('sClass');
-        classes.forEach(c => sc.innerHTML += `<option value="${c}">${c}</option>`);
-    }
-    init();
-
-    window.updateSections = () => {
-        const cls = document.getElementById('sClass').value;
-        const secs = [...new Set(allStudents.filter(s => s.class === cls).map(s => s.section))].sort();
-        const ss = document.getElementById('sSection');
-        ss.innerHTML = '<option value="">اختر الشعبة...</option>';
-        secs.forEach(s => ss.innerHTML += `<option value="${s}">${s}</option>`);
-    };
-
-    window.updateStudents = () => {
-        const cls = document.getElementById('sClass').value;
-        const sec = document.getElementById('sSection').value;
-        const students = allStudents.filter(s => s.class === cls && s.section === sec);
-        const st = document.getElementById('sStudent');
-        st.innerHTML = '<option value="">اختر الطالب...</option>';
-        students.forEach(s => st.innerHTML += `<option value="${s.name}">${s.name}</option>`);
-    };
-
+    // دالة الحذف المحمية بكلمة مرور
     window.clearAllData = async () => {
-        if(!confirm("⚠️ تحذير: سيتم حذف جميع سجلات الحضور. هل أنت متأكد؟")) return;
+        const password = prompt("⚠️ هذا الإجراء سيحذف جميع السجلات. يرجى إدخال كلمة مرور الإدارة:");
+        if (password !== "1234") { // يمكنك تغيير 1234 لأي كلمة مرور تريدها
+            alert("كلمة مرور خاطئة! تم إلغاء الحذف.");
+            return;
+        }
         const snap = await getDocs(collection(db, "attendance"));
         snap.forEach(async (d) => await deleteDoc(doc(db, "attendance", d.id)));
-        alert("تم الحذف!"); location.reload();
+        alert("تم مسح السجلات بنجاح!");
+        location.reload();
     };
 
+    // دالة عرض التقرير اليومي المجمعة
     window.fetchDaily = async () => {
         const date = document.getElementById('dailyDate').value;
         const snap = await getDocs(collection(db, "attendance"));
-        document.getElementById('res').innerHTML = `<h4>غيابات ${date}</h4>`;
+        let dailyReport = {};
+
         snap.forEach(d => {
             const data = d.data();
             if(data.date === date && data.status !== "حاضر") {
-                document.getElementById('res').innerHTML += `<div class="report-item"><strong>${data.name}</strong><span class="tag absent">${data.lesson}: ${data.status}</span></div>`;
-            }
-        });
-    };
-
-    window.fetchStudentReport = async () => {
-        const name = document.getElementById('sStudent').value;
-        if(!name) { alert("حدد الطالب!"); return; }
-        const snap = await getDocs(collection(db, "attendance"));
-        let report = {};
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.name === name) {
-                if(!report[data.date]) report[data.date] = { items: [] };
-                report[data.date].items.push(data.status);
+                if(!dailyReport[data.name]) {
+                    dailyReport[data.name] = { class: data.class || "غير محدد", sec: data.section || "-", lessons: [] };
+                }
+                dailyReport[data.name].lessons.push(data.lesson + ": " + data.status);
             }
         });
 
-        let fullAbsent = 0, partAbsent = 0, fullExcused = 0, partExcused = 0;
-        for(let d in report) {
-            let a = report[d].items.filter(i => i === "غائب").length;
-            let e = report[d].items.filter(i => i === "مجاز").length;
-            if(a >= 4) fullAbsent++; else partAbsent += a;
-            if(e >= 4) fullExcused++; else partExcused += e;
+        let html = `<h4>غيابات ${date}</h4>`;
+        for(let name in dailyReport) {
+            html += `<div class="report-item">
+                        <div><strong>${name}</strong> <small>(${dailyReport[name].class} - ${dailyReport[name].sec})</small></div>
+                        <div>${dailyReport[name].lessons.map(l => `<span class="tag absent">${l}</span>`).join('')}</div>
+                     </div>`;
         }
-
-        document.getElementById('res').innerHTML = `
-            <div class="summary-box"><strong>الخلاصة لـ ${name}:</strong><br>
-            أيام الغياب: ${(fullAbsent + (partAbsent/4)).toFixed(1)} يوم<br>
-            أيام الإجازات: ${(fullExcused + (partExcused/4)).toFixed(1)} يوم</div>`;
-        for(let date in report) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong><div>${report[date].items.map(i => `<span class="tag ${i==='غائب'?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
-        }
+        document.getElementById('res').innerHTML = html;
     };
+
+    // ... (اترك دالة fetchStudentReport كما هي، فهي تعمل بشكل جميل الآن) ...
 </script>
-</body>
-</html>

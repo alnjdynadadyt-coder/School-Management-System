@@ -1,117 +1,18 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقارير الذكية</title>
-    <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .summary-box { background: #e9ecef; padding: 10px; border-radius: 5px; margin-top: 10px; border-right: 5px solid #007bff; }
-        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
-        .report-item { padding: 8px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .tag { padding: 3px 6px; border-radius: 4px; font-size: 11px; margin-right: 3px; }
-        .absent { background: #f8d7da; color: #721c24; }
-        .excused { background: #fff3cd; color: #856404; }
-    </style>
-</head>
-<body>
-
-<div class="card" style="border: 1px solid #dc3545;">
-    <button onclick="clearAllData()" style="background:#dc3545; color:white; border:none;">حذف جميع سجلات الحضور (إعادة ضبط)</button>
-</div>
-
-<div class="card">
-    <h4>📋 التقرير اليومي</h4>
-    <input type="date" id="dailyDate">
-    <button onclick="fetchDaily()" style="background:#28a745; color:white; border:none; padding:10px; width:100%;">عرض تقرير اليوم</button>
-</div>
-
-<div class="card">
-    <h4>🔍 سجل الطالب المفصل</h4>
-    <input type="text" id="manualName" placeholder="أدخل اسم الطالب يدوياً...">
-    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
-    <select id="sSection" onchange="updateStudents()"><option value="">اختر الشعبة...</option></select>
-    <select id="sStudent"><option value="">اختر الطالب...</option></select>
-    <div style="display:flex; gap:5px;">
-        <input type="date" id="startDate"><input type="date" id="endDate">
-    </div>
-    <button onclick="fetchStudentReport()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">استخراج السجل</button>
-</div>
-
-<div id="res" class="card"></div>
-<a href="index.html" style="display:block; text-align:center; margin:15px 0; color:#555;">⬅️ العودة للقائمة الرئيسية</a>
-
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
+    
     const db = getFirestore(initializeApp({
         apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
         projectId: "school-manager-d1865",
         appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
     }));
 
-    document.getElementById('dailyDate').valueAsDate = new Date();
-
-    // دالة حذف البيانات
-    window.clearAllData = async () => {
-        if(!confirm("هل أنت متأكد من حذف كل سجلات الحضور؟")) return;
+    async function wipeDatabase() {
+        if(!confirm("⚠️ هل أنت متأكد من حذف جميع سجلات الحضور؟")) return;
         const snap = await getDocs(collection(db, "attendance"));
         snap.forEach(async (d) => await deleteDoc(doc(db, "attendance", d.id)));
-        alert("تم التنظيف!"); location.reload();
-    };
-
-    // (بقية الدوال المعتادة: init, updateSections, updateStudents)
-    // ... نضعها هنا ...
-    // [ملاحظة: لضمان استقرار الكود، تأكد من وجود نفس دوال update التي كانت في الكود السابق]
-
-    window.fetchStudentReport = async () => {
-        const name = document.getElementById('manualName').value || document.getElementById('sStudent').value;
-        const start = document.getElementById('startDate').value;
-        const end = document.getElementById('endDate').value;
-        const snap = await getDocs(collection(db, "attendance"));
-        
-        let report = {}, totalAbsent = 0, totalExcused = 0;
-        
-        snap.forEach(d => {
-            const data = d.data();
-            if(data.name === name && (!start || data.date >= start) && (!end || data.date <= end)) {
-                if(!report[data.date]) report[data.date] = { class: data.class, sec: data.section, items: [] };
-                report[data.date].items.push(data.status);
-            }
-        });
-
-        // المعادلة الذكية للمقترح
-        let fullDaysAbsent = 0, partialAbsentLessons = 0;
-        let fullDaysExcused = 0, partialExcusedLessons = 0;
-
-        for(let date in report) {
-            let absentInDay = report[date].items.filter(s => s === "غائب").length;
-            let excusedInDay = report[date].items.filter(s => s === "مجاز").length;
-
-            if(absentInDay >= 4) fullDaysAbsent++;
-            else partialAbsentLessons += absentInDay;
-            
-            if(excusedInDay >= 4) fullDaysExcused++;
-            else partialExcusedLessons += excusedInDay;
-        }
-
-        let totalDaysAbsent = fullDaysAbsent + (partialAbsentLessons / 4);
-        let totalDaysExcused = fullDaysExcused + (partialExcusedLessons / 4);
-
-        // العرض
-        document.getElementById('res').innerHTML = `
-            <h4>سجل: ${name}</h4>
-            <div class="summary-box">
-                <strong>الخلاصة:</strong><br>
-                أيام الغياب: ${totalDaysAbsent.toFixed(1)} يوم<br>
-                أيام الإجازات: ${totalDaysExcused.toFixed(1)} يوم
-            </div>`;
-        for(let date in report) {
-            document.getElementById('res').innerHTML += `<div class="report-item"><strong>${date}</strong> <div>${report[date].items.map(i => `<span class="tag ${i==='غائب'?'absent':'excused'}">${i}</span>`).join('')}</div></div>`;
-        }
-    };
-    // init(); // تأكد من استدعاء دالة التهيئة هنا
+        alert("تم مسح السجلات بنجاح! يمكنك الآن إضافة الكود الجديد.");
+    }
+    wipeDatabase();
 </script>
-</body>
-</html>

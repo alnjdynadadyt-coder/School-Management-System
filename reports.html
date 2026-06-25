@@ -11,30 +11,33 @@
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
         .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; font-size: 12px; }
-        .btn-export { background: #17a2b8; color: white; padding: 10px; border: none; border-radius: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
 
 <div class="card" style="border: 2px solid #dc3545;">
-    <button onclick="clearAllData()" style="background:#dc3545; color:white;">إعادة ضبط النظام (حذف سجلات الحضور)</button>
+    <h4>⚠️ حذف سجلات مخصص</h4>
+    <div class="grid-row">
+        <input type="date" id="delFrom">
+        <input type="date" id="delTo">
+    </div>
+    <div class="grid-row">
+        <select id="delClass"><option value="">الصف...</option></select>
+        <select id="delSection"><option value="">الشعبة...</option></select>
+    </div>
+    <button onclick="clearSpecificData()" style="background:#dc3545; color:white;">تنفيذ الحذف المشروط</button>
 </div>
 
 <div class="card">
-    <h4>📋 التقرير اليومي (عرض الغائبين والمجازين فقط)</h4>
+    <h4>📋 التقرير اليومي</h4>
     <input type="date" id="dailyDate">
     <button onclick="fetchDailyTable()" style="background:#28a745; color:white;">عرض التقرير</button>
 </div>
 
 <div class="card">
-    <h4>🔍 سجل الطالب المفرد</h4>
-    <select id="sClass"><option value="">اختر الصف...</option></select>
+    <h4>🔍 سجل الطالب أو الصف</h4>
+    <select id="sClass" onchange="updateSections()"><option value="">اختر الصف...</option></select>
     <select id="sSection"><option value="">اختر الشعبة...</option></select>
-    <select id="sStudent"><option value="all">اختر الطالب...</option></select>
-    <div class="grid-row">
-        <input type="date" id="dateFrom">
-        <input type="date" id="dateTo">
-    </div>
     <button onclick="fetchReports()" style="background:#007bff; color:white;">استخراج التقرير</button>
 </div>
 
@@ -44,58 +47,69 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ 
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", 
-        projectId: "school-manager-d1865", 
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4" 
-    }));
+    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
 
-    // دالة التقرير اليومي (تظهر فقط من لديه غياب أو إجازة)
+    // تحميل البيانات الأولية للقوائم
+    async function loadData() {
+        const snap = await getDocs(collection(db, "students"));
+        const students = snap.docs.map(d => d.data());
+        const classes = [...new Set(students.map(s => s.class))].sort();
+        classes.forEach(c => {
+            document.getElementById('sClass').innerHTML += `<option value="${c}">${c}</option>`;
+            document.getElementById('delClass').innerHTML += `<option value="${c}">${c}</option>`;
+        });
+    }
+    loadData();
+
+    window.updateSections = async () => {
+        const cls = document.getElementById('sClass').value;
+        const snap = await getDocs(collection(db, "students"));
+        const secs = [...new Set(snap.docs.filter(d => d.data().class === cls).map(d => d.data().section))].sort();
+        document.getElementById('sSection').innerHTML = '<option value="">الشعبة...</option>';
+        secs.forEach(s => document.getElementById('sSection').innerHTML += `<option value="${s}">${s}</option>`);
+    };
+
+    window.clearSpecificData = async () => {
+        if(prompt("كلمة المرور:") !== "1234") return;
+        const from = document.getElementById('delFrom').value, to = document.getElementById('delTo').value;
+        const cls = document.getElementById('delClass').value, sec = document.getElementById('delSection').value;
+        const snap = await getDocs(collection(db, "attendance"));
+        const batch = writeBatch(db);
+        let count = 0;
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.date >= from && data.date <= to && data.class === cls && data.section === sec) {
+                batch.delete(d.ref); count++;
+            }
+        });
+        await batch.commit(); alert("تم حذف " + count + " سجل."); location.reload();
+    };
+
     window.fetchDailyTable = async () => {
         const date = document.getElementById('dailyDate').value;
         const snap = await getDocs(collection(db, "attendance"));
-        
-        let reportData = {};
+        let html = `<table class="report-table"><tr><th>الطالب</th><th>الدرس</th><th>الحالة</th></tr>`;
         snap.forEach(d => {
-            let data = d.data();
-            // شرط الفلترة: اليوم المحدد + الحالة ليست "حاضر"
+            const data = d.data();
             if(data.date === date && data.status !== "حاضر") {
-                if(!reportData[data.name]) reportData[data.name] = { class: data.class, section: data.section, lessons: {} };
-                reportData[data.name].lessons[data.lesson] = data.status;
+                html += `<tr><td>${data.name}</td><td>${data.lesson || 'غير محدد'}</td><td>${data.status}</td></tr>`;
             }
         });
-
-        let html = `<h4>تقرير يوم ${date} (الاستثناءات فقط)</h4>
-                    <table id="exportTable" class="report-table">
-                    <tr><th>الطالب</th><th>الصف</th><th>د1</th><th>د2</th><th>د3</th><th>د4</th><th>د5</th><th>د6</th></tr>`;
-        
-        for(let name in reportData) {
-            html += `<tr><td>${name}</td><td>${reportData[name].class}-${reportData[name].section}</td>`;
-            for(let i=1; i<=6; i++) {
-                html += `<td>${reportData[name].lessons['الدرس '+i] || ''}</td>`;
-            }
-            html += `</tr>`;
-        }
-        
-        document.getElementById('res').innerHTML = html + `</table>
-        <button class="btn-export" onclick="exportExcel()">تصدير إلى Excel</button>`;
+        document.getElementById('res').innerHTML = html + `</table>`;
     };
 
-    window.exportExcel = () => {
-        const wb = XLSX.utils.table_to_book(document.getElementById('exportTable'));
-        XLSX.writeFile(wb, "تقرير_الغياب.xlsx");
-    };
-
-    window.clearAllData = async () => {
-        if(prompt("أدخل كلمة المرور:") !== "1234") return;
+    window.fetchReports = async () => {
+        const cls = document.getElementById('sClass').value, sec = document.getElementById('sSection').value;
         const snap = await getDocs(collection(db, "attendance"));
-        const batch = writeBatch(db);
-        snap.forEach(d => batch.delete(d.ref));
-        await batch.commit();
-        location.reload();
+        let html = `<table class="report-table"><tr><th>التاريخ</th><th>الطالب</th><th>الحالة</th></tr>`;
+        snap.forEach(d => {
+            const data = d.data();
+            if(data.class === cls && data.section === sec) {
+                html += `<tr><td>${data.date}</td><td>${data.name}</td><td>${data.status}</td></tr>`;
+            }
+        });
+        document.getElementById('res').innerHTML = html + `</table>`;
     };
-
-    // (يمكنك إضافة منطق fetchReports هنا لاحقاً في الخطوة الثانية)
 </script>
 </body>
 </html>

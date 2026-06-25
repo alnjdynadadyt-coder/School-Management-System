@@ -2,14 +2,14 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير اليومي</title>
+    <title>التقرير اليومي المحدث</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f4f4f9; }
         .card { background: white; padding: 15px; border-radius: 10px; overflow-x: auto; }
         input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 6px; text-align: center; }
+        .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
         .g { color: red; font-weight: bold; } 
         .m { color: #f39c12; font-weight: bold; }
         @media print { .no-print { display: none !important; } }
@@ -18,7 +18,7 @@
 <body>
 
 <div class="card no-print">
-    <h3>📋 التقرير اليومي المطور</h3>
+    <h3>📋 التقرير اليومي (جلب مرن)</h3>
     <input type="date" id="dailyDate">
     <button onclick="fetchDaily()" style="background:#5cb85c; color:white;">عرض التقرير</button>
     <div style="display:flex; gap:5px;">
@@ -42,24 +42,29 @@
 
     window.fetchDaily = async () => {
         const date = document.getElementById('dailyDate').value;
-        const dayName = new Date(date).toLocaleDateString('ar-SA', { weekday: 'long' });
-        document.getElementById('reportTitle').innerText = `تقرير يوم ${dayName} الموافق ${date}`;
+        document.getElementById('reportTitle').innerText = `تقرير يوم: ${date}`;
 
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         
-        // جلب البيانات فقط لمن لديهم غياب/إجازة في هذا التاريخ
         snap.forEach(doc => {
             const d = doc.data();
-            if(d.date === date && d.status !== "حاضر") {
-                if(!report[d.name]) report[d.name] = {cls: d.class || "-", sec: d.section || "-", lessons: {}};
-                report[d.name].lessons[d.lesson] = d.status;
+            // مقارنة مرنة (تحويل التاريخ لنص)
+            if(String(d.date) === String(date) && d.status !== "حاضر") {
+                const name = d.name || "غير معروف";
+                if(!report[name]) {
+                    report[name] = {
+                        cls: d.class || "-", 
+                        sec: d.section || d.sec || "-", // تجربة أكثر من اسم للحقل
+                        lessons: {}
+                    };
+                }
+                report[name].lessons[d.lesson] = d.status;
             }
         });
 
-        // التحقق مما إذا كان هناك بيانات
         if(Object.keys(report).length === 0) {
-            document.getElementById('tableContainer').innerHTML = "<p style='text-align:center;'>لا توجد حالات غياب أو إجازة لهذا اليوم.</p>";
+            document.getElementById('tableContainer').innerHTML = "<p style='text-align:center;'>لا توجد بيانات لهذا التاريخ. تأكد من تطابق التاريخ في قاعدة البيانات.</p>";
             return;
         }
 
@@ -81,7 +86,7 @@
 
     window.exportExcel = () => {
         let table = document.getElementById('reportTable');
-        if(!table) return alert("لا يوجد بيانات لتصديرها");
+        if(!table) return alert("لا يوجد بيانات");
         let wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
         XLSX.writeFile(wb, "Report_" + document.getElementById('dailyDate').value + ".xlsx");
     };

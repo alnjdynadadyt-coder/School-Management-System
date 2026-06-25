@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <title>التقرير اليومي</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
         .card { background: white; padding: 20px; border-radius: 10px; max-width: 900px; margin: auto; }
@@ -14,11 +13,16 @@
         .status-غائب { color: red; font-weight: bold; }
         .status-مجاز { color: #f39c12; font-weight: bold; }
         .btn-group { display: flex; gap: 5px; }
+        
+        /* إخفاء الأزرار عند الطباعة */
+        @media print {
+            .no-print { display: none !important; }
+        }
     </style>
 </head>
 <body>
 
-<div class="card">
+<div class="card no-print">
     <h3>📋 التقرير اليومي المجمع</h3>
     <input type="date" id="dailyDate">
     <button onclick="fetchDaily()" style="background:#5cb85c; color:white;">عرض التقرير</button>
@@ -29,7 +33,9 @@
     </div>
 </div>
 
-<div id="result" class="card" style="margin-top:20px;"></div>
+<div id="result" class="card" style="margin-top:20px;">
+    <h3 id="displayDate" style="text-align:center;"></h3>
+</div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -37,30 +43,34 @@
     
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
 
-    // تحديد تاريخ اليوم تلقائياً
     document.getElementById('dailyDate').valueAsDate = new Date();
 
     window.fetchDaily = async () => {
-        const date = document.getElementById('dailyDate').value;
+        const dateInput = document.getElementById('dailyDate').value;
+        const dateObj = new Date(dateInput);
+        const dayName = dateObj.toLocaleDateString('ar-SA', { weekday: 'long' });
+        document.getElementById('displayDate').innerText = `تقرير يوم ${dayName} الموافق ${dateInput}`;
+
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         snap.forEach(doc => {
             const d = doc.data();
-            if(d.date === date && d.status !== "حاضر") {
-                if(!report[d.name]) report[d.name] = {cls: d.class, sec: d.section || "-", list: []};
-                let statusColor = d.status === "غائب" ? "status-غائب" : "status-مجاز";
-                report[d.name].list.push(`${d.lesson.replace('الدرس ','')} <span class="${statusColor}">${d.status[0]}</span>`);
+            if(d.date === dateInput && d.status !== "حاضر") {
+                if(!report[d.name]) report[d.name] = {cls: d.class || "-", sec: d.section || "-", list: []};
+                let statusText = d.status === "غائب" ? "غ" : "م";
+                let statusClass = d.status === "غائب" ? "status-غائب" : "status-مجاز";
+                report[d.name].list.push(`الدرس ${d.lesson.replace('الدرس ','')}: <span class="${statusClass}">${statusText}</span>`);
             }
         });
 
         let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الصف</th><th>الشعبة</th><th>الغياب/الإجازات</th></tr>`;
         for(let n in report) html += `<tr><td>${n}</td><td>${report[n].cls}</td><td>${report[n].sec}</td><td>${report[n].list.join(' | ')}</td></tr>`;
-        document.getElementById('result').innerHTML = html + "</table>";
+        document.getElementById('result').innerHTML += html + "</table>";
     };
 
     window.exportExcel = () => {
         let wb = XLSX.utils.table_to_book(document.getElementById('reportTable'));
-        XLSX.writeFile(wb, "Report.xlsx");
+        XLSX.writeFile(wb, "Report_" + document.getElementById('dailyDate').value + ".xlsx");
     };
 </script>
 </body>

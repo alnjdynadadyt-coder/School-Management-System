@@ -2,72 +2,58 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير اليومي المحدث</title>
+    <title>التقرير التلقائي الشامل</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 10px; background: #f4f4f9; }
-        .card { background: white; padding: 15px; border-radius: 10px; overflow-x: auto; }
-        input, button, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        .g { color: red; font-weight: bold; }
-        .m { color: #f39c12; font-weight: bold; }
+        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>📋 التقرير اليومي (نظام القالب)</h3>
-    <input type="date" id="dailyDate">
-    <input type="text" id="filterClass" placeholder="أدخل الصف">
-    <button onclick="fetchDaily()" style="background:#007bff; color:white;">عرض التقرير لهذا الصف</button>
+    <h3>📊 التقرير التلقائي (لكل البيانات)</h3>
+    <button onclick="fetchAllData()">تحميل وعرض جميع البيانات تلقائياً</button>
+    <button onclick="window.print()">طباعة التقرير</button>
 </div>
 
-<div class="card" id="resultArea" style="margin-top:15px;">
+<div class="card" id="resultArea">
     <div id="tableContainer"></div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
     
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
 
-    window.fetchDaily = async () => {
-        const date = document.getElementById('dailyDate').value;
-        const targetClass = document.getElementById('filterClass').value;
-        
-        // 1. جلب كل سجلات الحضور لهذا اليوم
+    window.fetchAllData = async () => {
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
-
+        
         snap.forEach(doc => {
             const d = doc.data();
-            // مطابقة التاريخ والصف (بمرونة)
-            if(String(d.date) === String(date) && String(d.class) === String(targetClass)) {
-                if(!report[d.name]) {
-                    report[d.name] = {cls: d.class, sec: d.section || "-", lessons: {}};
-                }
-                report[d.name].lessons[d.lesson] = d.status;
+            // المفتاح هو دمج (التاريخ + اسم الطالب) لنضمن فرادة السجل
+            const key = `${d.date}_${d.name}`;
+            if(!report[key]) {
+                report[key] = {date: d.date, name: d.name, cls: d.class, sec: d.section, lessons: {}};
             }
+            report[key].lessons[d.lesson] = d.status;
         });
 
-        if(Object.keys(report).length === 0) {
-            alert("لا توجد بيانات لهذا الصف في هذا التاريخ.");
-            return;
-        }
-
-        // 2. بناء الجدول
-        let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الشعبة</th>`;
-        for(let i=1; i<=6; i++) html += `<th>الدرس ${i}</th>`;
+        let html = `<table class="table" id="reportTable"><tr><th>التاريخ</th><th>الطالب</th><th>الصف</th><th>الشعبة</th>`;
+        for(let i=1; i<=6; i++) html += `<th>د ${i}</th>`;
         html += `</tr>`;
 
-        for(let n in report) {
-            html += `<tr><td>${n}</td><td>${report[n].sec}</td>`;
+        for(let key in report) {
+            let r = report[key];
+            html += `<tr><td>${r.date}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.sec}</td>`;
             for(let i=1; i<=6; i++) {
-                let status = report[n].lessons[`الدرس ${i}`];
-                let display = status === "غائب" ? "غ" : (status === "مجاز" ? "م" : "");
-                html += `<td class="${status === 'غائب' ? 'g' : (status === 'مجاز' ? 'm' : '')}">${display}</td>`;
+                let status = r.lessons[`الدرس ${i}`] || "";
+                html += `<td>${status === "غائب" ? "غ" : (status === "مجاز" ? "م" : "")}</td>`;
             }
             html += `</tr>`;
         }

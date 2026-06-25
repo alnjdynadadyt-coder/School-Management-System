@@ -2,62 +2,64 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير التلقائي الشامل</title>
+    <title>التقرير اليومي الموثوق</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
         .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        button { padding: 10px 20px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 5px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        .table th, .table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .g { color: red; font-weight: bold; }
+        .m { color: #856404; font-weight: bold; }
+        .btn-group { display: flex; gap: 10px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>📊 التقرير التلقائي (لكل البيانات)</h3>
-    <button onclick="fetchAllData()">تحميل وعرض جميع البيانات تلقائياً</button>
-    <button onclick="window.print()">طباعة التقرير</button>
+    <h3>📋 تقرير الغيابات والإجازات اليومي</h3>
+    <input type="date" id="reportDate">
+    <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">استخراج التقرير لهذا اليوم</button>
 </div>
 
-<div class="card" id="resultArea">
+<div id="reportArea" class="card">
     <div id="tableContainer"></div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
     
-    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
+    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
 
-    window.fetchAllData = async () => {
-        const snap = await getDocs(collection(db, "attendance"));
-        let report = {};
+    window.generateReport = async () => {
+        const date = document.getElementById('reportDate').value;
+        const listDiv = document.getElementById('tableContainer');
+        listDiv.innerHTML = "جاري تجميع البيانات...";
+
+        const q = query(collection(db, "attendance"), where("date", "==", date));
+        const snap = await getDocs(q);
         
-        snap.forEach(doc => {
-            const d = doc.data();
-            // المفتاح هو دمج (التاريخ + اسم الطالب) لنضمن فرادة السجل
-            const key = `${d.date}_${d.name}`;
-            if(!report[key]) {
-                report[key] = {date: d.date, name: d.name, cls: d.class, sec: d.section, lessons: {}};
+        let report = {};
+        snap.forEach(d => {
+            const data = d.data();
+            // لا نعرض الحاضرين في التقرير اليومي، فقط الغائب والمجاز
+            if (data.status !== "حاضر") {
+                if (!report[data.name]) report[data.name] = { cls: data.class, lessons: [] };
+                report[data.name].lessons.push(`${data.lesson} (${data.status === 'غائب' ? 'غ' : 'م'})`);
             }
-            report[key].lessons[d.lesson] = d.status;
         });
 
-        let html = `<table class="table" id="reportTable"><tr><th>التاريخ</th><th>الطالب</th><th>الصف</th><th>الشعبة</th>`;
-        for(let i=1; i<=6; i++) html += `<th>د ${i}</th>`;
-        html += `</tr>`;
-
-        for(let key in report) {
-            let r = report[key];
-            html += `<tr><td>${r.date}</td><td>${r.name}</td><td>${r.cls}</td><td>${r.sec}</td>`;
-            for(let i=1; i<=6; i++) {
-                let status = r.lessons[`الدرس ${i}`] || "";
-                html += `<td>${status === "غائب" ? "غ" : (status === "مجاز" ? "م" : "")}</td>`;
-            }
-            html += `</tr>`;
+        if (Object.keys(report).length === 0) {
+            listDiv.innerHTML = "لا توجد حالات غياب أو إجازة مسجلة لهذا التاريخ.";
+            return;
         }
-        document.getElementById('tableContainer').innerHTML = html + "</table>";
+
+        let html = `<table class="table"><tr><th>اسم الطالب</th><th>الصف</th><th>الدروس المسجلة</th></tr>`;
+        for (let name in report) {
+            html += `<tr><td>${name}</td><td>${report[name].cls}</td><td>${report[name].lessons.join(' - ')}</td></tr>`;
+        }
+        listDiv.innerHTML = html + "</table>";
     };
 </script>
 </body>

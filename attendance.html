@@ -2,69 +2,68 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سجل الحضور الموحد</title>
+    <title>سجل الحضور - العودة للنسخة المستقرة</title>
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .student-row { display: grid; grid-template-columns: 2fr repeat(6, 1fr); gap: 5px; align-items: center; border-bottom: 1px solid #eee; padding: 5px 0; }
-        select { padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
-        .save-btn { background: #28a745; color: white; padding: 12px; width: 100%; border: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
+        .card { background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+        select, input { width: 100%; padding: 10px; margin: 4px 0; border: 1px solid #ddd; border-radius: 4px; }
+        .student-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; }
+        .status-btn { padding: 5px 12px; border: none; border-radius: 4px; cursor: pointer; width: 80px; }
+        .present { background: #d4edda; } .absent { background: #f8d7da; } .excused { background: #fff3cd; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <input type="date" id="date">
-    <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option></select>
-    <select id="fSection"><option>أ</option><option>ب</option></select>
-    <button onclick="fetchStudents()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">جلب السجل</button>
+    <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
+    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option></select>
+    <button onclick="fetchAttendance()" style="background:#007bff; color:white; border:none; padding:12px; width:100%;">جلب السجل</button>
 </div>
 
-<div id="studentList" class="card" style="margin-top:10px;"></div>
-<button id="saveBtn" class="save-btn" onclick="saveAll()">حفظ التعديلات (كلمة السر 138)</button>
+<div id="studentList" class="card"></div>
+<button id="saveBtn" style="background:#28a745; color:white; padding:10px; width:100%; border:none; display:none;" onclick="saveChanges()">حفظ التعديلات</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
+    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا كما كانت في الملف القديم */ }));
     document.getElementById('date').valueAsDate = new Date();
 
-    window.fetchStudents = async () => {
+    window.fetchAttendance = async () => {
         const listDiv = document.getElementById('studentList');
         const cls = document.getElementById('fClass').value;
         const sec = document.getElementById('fSection').value;
+        listDiv.innerHTML = "جاري الجلب...";
         
-        listDiv.innerHTML = "جاري التحميل...";
-        const snap = await getDocs(query(collection(db, "students"), where("class", "==", cls), where("section", "==", sec)));
+        const q = query(collection(db, "students"), where("class", "==", cls), where("section", "==", sec));
+        const snap = await getDocs(q);
         
-        let html = `<div class="student-row"><b>الاسم</b>${[1,2,3,4,5,6].map(i => `<b>د${i}</b>`).join('')}</div>`;
+        listDiv.innerHTML = "";
         snap.forEach(d => {
-            const name = d.data().name;
-            html += `<div class="student-row" data-name="${name}"><span>${name}</span>`;
-            for(let i=1; i<=6; i++) {
-                html += `<select class="status" data-lesson="الدرس ${i}">
-                    <option value="حاضر">ح</option><option value="غائب">غ</option><option value="مجاز">م</option>
-                </select>`;
-            }
-            html += `</div>`;
+            listDiv.innerHTML += `<div class="student-row"><span class="s-name">${d.data().name}</span> <button class="status-btn present" onclick="toggle(this)">حاضر</button></div>`;
         });
-        listDiv.innerHTML = html;
+        document.getElementById('saveBtn').style.display = "block";
     };
 
-    window.saveAll = async () => {
-        if (prompt("أدخل كلمة المرور:") !== "138") return alert("خطأ!");
-        const date = document.getElementById('date').value;
-        const cls = document.getElementById('fClass').value;
-        document.querySelectorAll('.student-row[data-name]').forEach(row => {
-            const name = row.dataset.name;
-            row.querySelectorAll('.status').forEach(sel => {
-                setDoc(doc(db, "attendance", `${date}_${name}_${sel.dataset.lesson}`), {
-                    name, date, class: cls, lesson: sel.dataset.lesson, status: sel.value
-                });
+    window.toggle = (btn) => {
+        if (btn.innerText === "حاضر") { btn.innerText = "غائب"; btn.className = "status-btn absent"; }
+        else if (btn.innerText === "غائب") { btn.innerText = "مجاز"; btn.className = "status-btn excused"; }
+        else { btn.innerText = "حاضر"; btn.className = "status-btn present"; }
+    };
+
+    window.saveChanges = async () => {
+        const rows = document.querySelectorAll('.student-row');
+        for (let row of rows) {
+            const name = row.querySelector('.s-name').innerText;
+            const status = row.querySelector('button').innerText;
+            await setDoc(doc(db, "attendance", `${document.getElementById('date').value}_${name}`), { 
+                name, status, date: document.getElementById('date').value, 
+                class: document.getElementById('fClass').value 
             });
-        });
-        alert("تم الحفظ!");
+        }
+        alert("تم الحفظ بنجاح!");
     };
 </script>
 </body>

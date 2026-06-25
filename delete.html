@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>صفحة الحذف المخصص</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; }
+        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; }
+        button { background: #d9534f; color: white; cursor: pointer; border: none; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h3>🗑️ حذف سجلات الحضور</h3>
+    <label>من تاريخ:</label>
+    <input type="date" id="dFrom">
+    <label>إلى تاريخ:</label>
+    <input type="date" id="dTo">
+    <button onclick="deleteData()">حذف السجلات في هذه الفترة</button>
+    <button onclick="window.location.href='index.html'" style="background:#6c757d;">عودة للرئيسية</button>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    
+    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
+
+    window.deleteData = async () => {
+        if(prompt("كلمة السر:") !== "1234") return alert("كلمة سر خاطئة!");
+        const f = document.getElementById('dFrom').value, t = document.getElementById('dTo').value;
+        if(!f || !t) return alert("يرجى تحديد التاريخ من وإلى");
+        
+        const snap = await getDocs(collection(db, "attendance"));
+        let batch = writeBatch(db), count = 0;
+        snap.forEach(doc => {
+            const d = doc.data();
+            if(d.date >= f && d.date <= t) { batch.delete(doc.ref); count++; }
+        });
+        if(count > 0) { await batch.commit(); alert("تم حذف " + count + " سجل."); location.reload(); }
+        else alert("لا توجد سجلات في هذا النطاق الزمني.");
+    };
+</script>
+</body>
+</html>

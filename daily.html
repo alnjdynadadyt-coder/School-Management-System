@@ -3,12 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <title>التقرير اليومي</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; max-width: 800px; margin: auto; }
-        input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; }
+        .card { background: white; padding: 20px; border-radius: 10px; max-width: 900px; margin: auto; }
+        input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
         .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .status-غائب { color: red; font-weight: bold; }
+        .status-مجاز { color: #f39c12; font-weight: bold; }
+        .btn-group { display: flex; gap: 5px; }
     </style>
 </head>
 <body>
@@ -17,7 +22,11 @@
     <h3>📋 التقرير اليومي المجمع</h3>
     <input type="date" id="dailyDate">
     <button onclick="fetchDaily()" style="background:#5cb85c; color:white;">عرض التقرير</button>
-    <button onclick="window.location.href='index.html'" style="background:#6c757d; color:white;">العودة للرئيسية</button>
+    <div class="btn-group">
+        <button onclick="exportExcel()">تصدير Excel</button>
+        <button onclick="window.print()">طباعة/PDF</button>
+        <button onclick="window.location.href='index.html'" style="background:#6c757d; color:white;">عودة</button>
+    </div>
 </div>
 
 <div id="result" class="card" style="margin-top:20px;"></div>
@@ -28,23 +37,30 @@
     
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
 
+    // تحديد تاريخ اليوم تلقائياً
+    document.getElementById('dailyDate').valueAsDate = new Date();
+
     window.fetchDaily = async () => {
         const date = document.getElementById('dailyDate').value;
-        if(!date) return alert("اختر التاريخ!");
-        
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         snap.forEach(doc => {
             const d = doc.data();
             if(d.date === date && d.status !== "حاضر") {
-                if(!report[d.name]) report[d.name] = {cls: d.class, list: []};
-                report[d.name].list.push(d.lesson + ": " + d.status);
+                if(!report[d.name]) report[d.name] = {cls: d.class, sec: d.section || "-", list: []};
+                let statusColor = d.status === "غائب" ? "status-غائب" : "status-مجاز";
+                report[d.name].list.push(`${d.lesson.replace('الدرس ','')} <span class="${statusColor}">${d.status[0]}</span>`);
             }
         });
 
-        let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازات</th></tr>`;
-        for(let n in report) html += `<tr><td>${n}</td><td>${report[n].cls}</td><td>${report[n].list.join('، ')}</td></tr>`;
+        let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الصف</th><th>الشعبة</th><th>الغياب/الإجازات</th></tr>`;
+        for(let n in report) html += `<tr><td>${n}</td><td>${report[n].cls}</td><td>${report[n].sec}</td><td>${report[n].list.join(' | ')}</td></tr>`;
         document.getElementById('result').innerHTML = html + "</table>";
+    };
+
+    window.exportExcel = () => {
+        let wb = XLSX.utils.table_to_book(document.getElementById('reportTable'));
+        XLSX.writeFile(wb, "Report.xlsx");
     };
 </script>
 </body>

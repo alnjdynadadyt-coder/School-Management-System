@@ -12,11 +12,7 @@
         .table th, .table td { border: 1px solid #ddd; padding: 6px; text-align: center; }
         .g { color: red; font-weight: bold; } 
         .m { color: #f39c12; font-weight: bold; }
-        
-        /* إخفاء الأزرار فقط عند الطباعة */
-        @media print {
-            .no-print { display: none !important; }
-        }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
@@ -51,13 +47,21 @@
 
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
+        
+        // جلب البيانات فقط لمن لديهم غياب/إجازة في هذا التاريخ
         snap.forEach(doc => {
             const d = doc.data();
-            if(d.date === date) {
+            if(d.date === date && d.status !== "حاضر") {
                 if(!report[d.name]) report[d.name] = {cls: d.class || "-", sec: d.section || "-", lessons: {}};
                 report[d.name].lessons[d.lesson] = d.status;
             }
         });
+
+        // التحقق مما إذا كان هناك بيانات
+        if(Object.keys(report).length === 0) {
+            document.getElementById('tableContainer').innerHTML = "<p style='text-align:center;'>لا توجد حالات غياب أو إجازة لهذا اليوم.</p>";
+            return;
+        }
 
         let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الصف</th><th>الشعبة</th>`;
         for(let i=1; i<=6; i++) html += `<th>د ${i}</th>`;
@@ -77,6 +81,7 @@
 
     window.exportExcel = () => {
         let table = document.getElementById('reportTable');
+        if(!table) return alert("لا يوجد بيانات لتصديرها");
         let wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
         XLSX.writeFile(wb, "Report_" + document.getElementById('dailyDate').value + ".xlsx");
     };

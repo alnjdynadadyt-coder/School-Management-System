@@ -2,24 +2,21 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>نظام إدارة التقارير</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام الإدارة المدرسية الرقمي</title>
     <style>
-        body { font-family: sans-serif; padding: 40px; background: #f4f4f9; text-align: center; }
-        .nav-btn { display: block; width: 100%; max-width: 400px; margin: 15px auto; padding: 20px; font-size: 18px; border: none; border-radius: 10px; cursor: pointer; color: white; text-decoration: none; transition: 0.3s; }
-        .btn-daily { background: #5cb85c; }
-        .btn-reports { background: #007bff; }
-        .btn-delete { background: #d9534f; }
-        .nav-btn:hover { opacity: 0.8; }
+        body { font-family: sans-serif; text-align: center; padding: 30px; background-color: #f0f2f5; }
+        .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; justify-items: center; }
+        .btn { padding: 20px 40px; background: #007bff; color: white; border-radius: 10px; text-decoration: none; font-weight: bold; width: 220px; display: block; margin: 10px; }
     </style>
 </head>
 <body>
-
-    <h1>مرحباً بك في نظام الإدارة</h1>
-    <p>اختر الخدمة المطلوبة للبدء:</p>
-
-    <a href="daily.html" class="nav-btn btn-daily">📋 التقرير اليومي</a>
-    <a href="reports.html" class="nav-btn btn-reports">🔍 التقارير الشاملة</a>
-    <a href="delete.html" class="nav-btn btn-delete">⚠️ حذف السجلات</a>
-
+    <h1>لوحة تحكم المدرسة</h1>
+    <div class="dashboard">
+        <a href="students.html" class="btn">إدارة الطلاب</a>
+        <a href="attendance.html" class="btn">تسجيل الحضور</a>
+        <a href="reports.html" class="btn" style="background: #28a745;">تقارير الحضور</a>
+        <a href="#" class="btn">الأرشيف الرقمي</a>
+    </div>
 </body>
 </html>

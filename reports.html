@@ -2,93 +2,66 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>نظام التقارير المعدل</title>
+    <title>النظام النهائي</title>
     <style>
-        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 15px; border-radius: 8px; margin-bottom: 10px; }
-        select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; }
-        .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        .table th, .table td { border: 1px solid #ccc; padding: 10px; text-align: center; }
+        input, button { padding: 10px; width: 100%; margin: 5px 0; border: 1px solid #ddd; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h4>⚠️ الحذف المشروط</h4>
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:5px;">
-        <input type="date" id="delFrom"><input type="date" id="delTo">
-    </div>
-    <input type="text" id="delClass" placeholder="الصف (مثل: الرابع)">
-    <input type="text" id="delSection" placeholder="الشعبة (مثل: أ)">
-    <button onclick="clearData()" style="background:#dc3545; color:white;">حذف السجلات المطابقة</button>
+    <h3>⚠️ حذف السجلات (بين تاريخين)</h3>
+    <input type="date" id="delFrom"><input type="date" id="delTo">
+    <button onclick="clearData()" style="background:#d9534f; color:white;">تنفيذ الحذف</button>
 </div>
 
 <div class="card">
-    <h4>📋 التقرير اليومي (مجمع)</h4>
-    <input type="date" id="dailyDate">
-    <button onclick="fetchDaily()" style="background:#28a745; color:white;">عرض الغياب/الإجازات</button>
+    <h3>📋 تقرير الغياب المجمع</h3>
+    <input type="date" id="reportDate">
+    <button onclick="fetchReport()" style="background:#5cb85c; color:white;">عرض التقرير</button>
 </div>
 
-<div class="card">
-    <h4>🔍 التقرير الشامل</h4>
-    <input type="text" id="sClass" placeholder="الصف">
-    <input type="text" id="sSection" placeholder="الشعبة">
-    <button onclick="fetchComprehensive()" style="background:#007bff; color:white;">استخراج التقرير</button>
-</div>
-
-<div id="res" class="card"></div>
+<div id="displayArea" class="card"></div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
 
-    // دالة مساعدة لتنظيف النصوص ومقارنتها
-    const clean = (val) => String(val || "").trim();
-
+    // الحذف: يعتمد على التاريخ فقط لضمان النجاح
     window.clearData = async () => {
-        if(prompt("كلمة المرور:") !== "1234") return;
+        if(prompt("كلمة السر:") !== "1234") return;
         const f = document.getElementById('delFrom').value, t = document.getElementById('delTo').value;
-        const c = clean(document.getElementById('delClass').value), s = clean(document.getElementById('delSection').value);
         const snap = await getDocs(collection(db, "attendance"));
         let batch = writeBatch(db), count = 0;
         snap.forEach(doc => {
             const d = doc.data();
-            if(d.date >= f && d.date <= t && clean(d.class) === c && clean(d.section) === s) {
-                batch.delete(doc.ref); count++;
-            }
+            if(d.date >= f && d.date <= t) { batch.delete(doc.ref); count++; }
         });
-        if(count > 0) { await batch.commit(); alert("تم حذف " + count + " سجل"); location.reload(); }
-        else alert("لا توجد سجلات تطابق (تأكد من كتابة الصف والشعبة تماماً كما في قاعدة البيانات).");
+        if(count > 0) { await batch.commit(); alert("تم حذف " + count + " سجل."); location.reload(); }
+        else alert("لا توجد سجلات في هذا التاريخ.");
     };
 
-    window.fetchDaily = async () => {
-        const date = document.getElementById('dailyDate').value;
+    // التقرير: يجمع الحالات لكل طالب
+    window.fetchReport = async () => {
+        const date = document.getElementById('reportDate').value;
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
         snap.forEach(doc => {
             const d = doc.data();
             if(d.date === date && d.status !== "حاضر") {
-                if(!report[d.name]) report[d.name] = {cls: d.class, sec: d.section, list: []};
+                if(!report[d.name]) report[d.name] = {cls: d.class, list: []};
                 report[d.name].list.push(d.lesson + ": " + d.status);
             }
         });
-        let h = `<table class="report-table"><tr><th>الطالب</th><th>الصف/الشعبة</th><th>التفاصيل</th></tr>`;
-        for(let n in report) h += `<tr><td>${n}</td><td>${report[n].cls}/${report[n].sec}</td><td>${report[n].list.join(', ')}</td></tr>`;
-        document.getElementById('res').innerHTML = h + `</table>`;
-    };
-
-    window.fetchComprehensive = async () => {
-        const c = clean(document.getElementById('sClass').value), s = clean(document.getElementById('sSection').value);
-        const snap = await getDocs(collection(db, "attendance"));
-        let h = `<table class="report-table"><tr><th>التاريخ</th><th>الطالب</th><th>الحالة</th></tr>`;
-        snap.forEach(doc => {
-            const d = doc.data();
-            if(clean(d.class) === c && clean(d.section) === s) {
-                h += `<tr><td>${d.date}</td><td>${d.name}</td><td>${d.status}</td></tr>`;
-            }
-        });
-        document.getElementById('res').innerHTML = h + `</table>`;
+        let h = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازات</th></tr>`;
+        for(let n in report) h += `<tr><td>${n}</td><td>${report[n].cls}</td><td>${report[n].list.join('، ')}</td></tr>`;
+        document.getElementById('displayArea').innerHTML = h + "</table>";
     };
 </script>
 </body>

@@ -7,73 +7,63 @@
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f4f4f9; }
         .card { background: white; padding: 15px; border-radius: 10px; overflow-x: auto; }
-        input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+        input, button, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; }
+        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .table th, .table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        .g { color: red; font-weight: bold; } 
+        .g { color: red; font-weight: bold; }
         .m { color: #f39c12; font-weight: bold; }
-        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
 
-<div class="card no-print">
-    <h3>📋 التقرير اليومي (جلب مرن)</h3>
+<div class="card">
+    <h3>📋 التقرير اليومي (نظام القالب)</h3>
     <input type="date" id="dailyDate">
-    <button onclick="fetchDaily()" style="background:#5cb85c; color:white;">عرض التقرير</button>
-    <div style="display:flex; gap:5px;">
-        <button onclick="exportExcel()">تصدير Excel</button>
-        <button onclick="window.print()">طباعة PDF</button>
-        <button onclick="window.location.href='index.html'" style="background:#6c757d; color:white;">عودة</button>
-    </div>
+    <input type="text" id="filterClass" placeholder="أدخل الصف">
+    <button onclick="fetchDaily()" style="background:#007bff; color:white;">عرض التقرير لهذا الصف</button>
 </div>
 
 <div class="card" id="resultArea" style="margin-top:15px;">
-    <h4 id="reportTitle" style="text-align:center;"></h4>
     <div id="tableContainer"></div>
 </div>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, getDocs, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
     
     const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
-    document.getElementById('dailyDate').valueAsDate = new Date();
 
     window.fetchDaily = async () => {
         const date = document.getElementById('dailyDate').value;
-        document.getElementById('reportTitle').innerText = `تقرير يوم: ${date}`;
-
+        const targetClass = document.getElementById('filterClass').value;
+        
+        // 1. جلب كل سجلات الحضور لهذا اليوم
         const snap = await getDocs(collection(db, "attendance"));
         let report = {};
-        
+
         snap.forEach(doc => {
             const d = doc.data();
-            // مقارنة مرنة (تحويل التاريخ لنص)
-            if(String(d.date) === String(date) && d.status !== "حاضر") {
-                const name = d.name || "غير معروف";
-                if(!report[name]) {
-                    report[name] = {
-                        cls: d.class || "-", 
-                        sec: d.section || d.sec || "-", // تجربة أكثر من اسم للحقل
-                        lessons: {}
-                    };
+            // مطابقة التاريخ والصف (بمرونة)
+            if(String(d.date) === String(date) && String(d.class) === String(targetClass)) {
+                if(!report[d.name]) {
+                    report[d.name] = {cls: d.class, sec: d.section || "-", lessons: {}};
                 }
-                report[name].lessons[d.lesson] = d.status;
+                report[d.name].lessons[d.lesson] = d.status;
             }
         });
 
         if(Object.keys(report).length === 0) {
-            document.getElementById('tableContainer').innerHTML = "<p style='text-align:center;'>لا توجد بيانات لهذا التاريخ. تأكد من تطابق التاريخ في قاعدة البيانات.</p>";
+            alert("لا توجد بيانات لهذا الصف في هذا التاريخ.");
             return;
         }
 
-        let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الصف</th><th>الشعبة</th>`;
-        for(let i=1; i<=6; i++) html += `<th>د ${i}</th>`;
+        // 2. بناء الجدول
+        let html = `<table class="table" id="reportTable"><tr><th>الطالب</th><th>الشعبة</th>`;
+        for(let i=1; i<=6; i++) html += `<th>الدرس ${i}</th>`;
         html += `</tr>`;
 
         for(let n in report) {
-            html += `<tr><td>${n}</td><td>${report[n].cls}</td><td>${report[n].sec}</td>`;
+            html += `<tr><td>${n}</td><td>${report[n].sec}</td>`;
             for(let i=1; i<=6; i++) {
                 let status = report[n].lessons[`الدرس ${i}`];
                 let display = status === "غائب" ? "غ" : (status === "مجاز" ? "م" : "");
@@ -82,13 +72,6 @@
             html += `</tr>`;
         }
         document.getElementById('tableContainer').innerHTML = html + "</table>";
-    };
-
-    window.exportExcel = () => {
-        let table = document.getElementById('reportTable');
-        if(!table) return alert("لا يوجد بيانات");
-        let wb = XLSX.utils.table_to_book(table, {sheet: "Sheet1"});
-        XLSX.writeFile(wb, "Report_" + document.getElementById('dailyDate').value + ".xlsx");
     };
 </script>
 </body>

@@ -2,67 +2,86 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الحضور الآمن</title>
+    <title>سجل الحضور الشامل</title>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; max-width: 900px; margin: auto; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        select { padding: 5px; width: 100%; }
-        button { padding: 15px 30px; background: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
+        .card { background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
+        .student-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 5px; align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; font-size: 12px; }
+        select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
+        .save-btn { background: #28a745; color: white; padding: 15px; width: 100%; border: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>📝 تسجيل الحضور اليومي (محمي)</h3>
     <input type="date" id="date">
-    <input type="text" id="name" placeholder="اسم الطالب">
-    <input type="text" id="cls" placeholder="الصف">
-    <input type="text" id="sec" placeholder="الشعبة">
-
-    <table>
-        <tr>
-            <th>الدرس</th>
-            <th>الحالة</th>
-        </tr>
-        <tr><td>الدرس 1</td><td><select id="l1"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-        <tr><td>الدرس 2</td><td><select id="l2"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-        <tr><td>الدرس 3</td><td><select id="l3"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-        <tr><td>الدرس 4</td><td><select id="l4"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-        <tr><td>الدرس 5</td><td><select id="l5"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-        <tr><td>الدرس 6</td><td><select id="l6"><option>حاضر</option><option>غائب</option><option>مجاز</option></select></td></tr>
-    </table>
-    <br>
-    <button onclick="secureSave()">حفظ البيانات (يتطلب كلمة مرور)</button>
-    <button onclick="window.location.href='index.html'" style="background:#6c757d;">عودة</button>
+    <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
+    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option></select>
+    <button onclick="fetchStudents()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">جلب قائمة الطلاب</button>
 </div>
+
+<div id="studentList" class="card">
+    </div>
+<button id="saveBtn" class="save-btn" style="display:none;" onclick="saveAll()">حفظ سجل اليوم (كلمة السر مطلوبة)</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    
-    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
-    const ADMIN_PASS = "12345"; // ضع هنا رقمك السري الخاص
+    import { getFirestore, collection, query, where, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    window.secureSave = async () => {
-        const pass = prompt("يرجى إدخال كلمة المرور للتحكم في البيانات:");
-        if (pass !== ADMIN_PASS) return alert("كلمة مرور خاطئة!");
+    const db = getFirestore(initializeApp({ /* أضف بيانات الـ config هنا كما في كودك */ }));
+    document.getElementById('date').valueAsDate = new Date();
+    const SECRET_PASSWORD = "138";
 
-        for(let i=1; i<=6; i++) {
-            let status = document.getElementById('l'+i).value;
-            if(status !== "حاضر") {
-                await addDoc(collection(db, "attendance"), {
-                    date: document.getElementById('date').value,
-                    name: document.getElementById('name').value,
-                    class: document.getElementById('cls').value,
-                    section: document.getElementById('sec').value,
-                    lesson: "الدرس " + i,
-                    status: status
-                });
+    window.fetchStudents = async () => {
+        const listDiv = document.getElementById('studentList');
+        const cls = document.getElementById('fClass').value;
+        const sec = document.getElementById('fSection').value;
+        
+        listDiv.innerHTML = "جاري التحميل...";
+        const q = query(collection(db, "students"), where("class", "==", cls), where("section", "==", sec));
+        const snap = await getDocs(q);
+        
+        listDiv.innerHTML = `<div class="student-row"><b>الاسم</b>${[1,2,3,4,5,6].map(i => `<b>د${i}</b>`).join('')}</div>`;
+        
+        snap.forEach(d => {
+            const student = d.data();
+            let row = `<div class="student-row" data-name="${student.name}"><span>${student.name}</span>`;
+            for(let i=1; i<=6; i++) {
+                row += `<select class="lesson-status" data-lesson="الدرس ${i}">
+                    <option value="حاضر">ح</option>
+                    <option value="غائب">غ</option>
+                    <option value="مجاز">م</option>
+                </select>`;
+            }
+            listDiv.innerHTML += row + "</div>";
+        });
+        document.getElementById('saveBtn').style.display = "block";
+    };
+
+    window.saveAll = async () => {
+        const pass = prompt("أدخل كلمة المرور:");
+        if (pass !== SECRET_PASSWORD) return alert("كلمة مرور خاطئة!");
+
+        const rows = document.querySelectorAll('.student-row[data-name]');
+        const date = document.getElementById('date').value;
+        const cls = document.getElementById('fClass').value;
+        const sec = document.getElementById('fSection').value;
+
+        for (let row of rows) {
+            const name = row.dataset.name;
+            const selects = row.querySelectorAll('.lesson-status');
+            
+            for (let sel of selects) {
+                const status = sel.value;
+                const lesson = sel.dataset.lesson;
+                if (status !== "حاضر") { // نحفظ فقط الغياب والإجازة لتقليل الضغط على قاعدة البيانات
+                    await setDoc(doc(db, "attendance", `${date}_${cls}_${name}_${lesson}`), { 
+                        name, status, date, lesson, class: cls, section: sec 
+                    });
+                }
             }
         }
-        alert("تم الحفظ بنجاح!");
+        alert("تم حفظ السجلات كاملة!");
     };
 </script>
 </body>

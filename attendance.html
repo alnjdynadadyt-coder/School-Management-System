@@ -2,35 +2,33 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>سجل الحضور الشامل</title>
+    <title>سجل الحضور الموحد</title>
     <style>
         body { font-family: sans-serif; padding: 10px; background: #f0f2f5; }
-        .card { background: white; padding: 10px; border-radius: 8px; margin-bottom: 10px; }
-        .student-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1fr 1fr; gap: 5px; align-items: center; padding: 8px 5px; border-bottom: 1px solid #eee; font-size: 12px; }
-        select { padding: 5px; border-radius: 4px; border: 1px solid #ccc; }
-        .save-btn { background: #28a745; color: white; padding: 15px; width: 100%; border: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
+        .card { background: white; padding: 15px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .student-row { display: grid; grid-template-columns: 2fr repeat(6, 1fr); gap: 5px; align-items: center; border-bottom: 1px solid #eee; padding: 5px 0; }
+        select { padding: 4px; border: 1px solid #ddd; border-radius: 4px; font-size: 12px; }
+        .save-btn { background: #28a745; color: white; padding: 12px; width: 100%; border: none; border-radius: 6px; font-weight: bold; margin-top: 15px; }
     </style>
 </head>
 <body>
 
 <div class="card">
     <input type="date" id="date">
-    <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
-    <select id="fSection"><option>أ</option><option>ب</option><option>ج</option></select>
-    <button onclick="fetchStudents()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">جلب قائمة الطلاب</button>
+    <select id="fClass"><option>الرابع العلمي</option><option>الخامس العلمي</option></select>
+    <select id="fSection"><option>أ</option><option>ب</option></select>
+    <button onclick="fetchStudents()" style="background:#007bff; color:white; border:none; padding:10px; width:100%;">جلب السجل</button>
 </div>
 
-<div id="studentList" class="card">
-    </div>
-<button id="saveBtn" class="save-btn" style="display:none;" onclick="saveAll()">حفظ سجل اليوم (كلمة السر مطلوبة)</button>
+<div id="studentList" class="card" style="margin-top:10px;"></div>
+<button id="saveBtn" class="save-btn" onclick="saveAll()">حفظ التعديلات (كلمة السر 138)</button>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs, doc, setDoc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+    import { getFirestore, collection, query, where, getDocs, setDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
 
-    const db = getFirestore(initializeApp({ /* أضف بيانات الـ config هنا كما في كودك */ }));
+    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
     document.getElementById('date').valueAsDate = new Date();
-    const SECRET_PASSWORD = "138";
 
     window.fetchStudents = async () => {
         const listDiv = document.getElementById('studentList');
@@ -38,50 +36,35 @@
         const sec = document.getElementById('fSection').value;
         
         listDiv.innerHTML = "جاري التحميل...";
-        const q = query(collection(db, "students"), where("class", "==", cls), where("section", "==", sec));
-        const snap = await getDocs(q);
+        const snap = await getDocs(query(collection(db, "students"), where("class", "==", cls), where("section", "==", sec)));
         
-        listDiv.innerHTML = `<div class="student-row"><b>الاسم</b>${[1,2,3,4,5,6].map(i => `<b>د${i}</b>`).join('')}</div>`;
-        
+        let html = `<div class="student-row"><b>الاسم</b>${[1,2,3,4,5,6].map(i => `<b>د${i}</b>`).join('')}</div>`;
         snap.forEach(d => {
-            const student = d.data();
-            let row = `<div class="student-row" data-name="${student.name}"><span>${student.name}</span>`;
+            const name = d.data().name;
+            html += `<div class="student-row" data-name="${name}"><span>${name}</span>`;
             for(let i=1; i<=6; i++) {
-                row += `<select class="lesson-status" data-lesson="الدرس ${i}">
-                    <option value="حاضر">ح</option>
-                    <option value="غائب">غ</option>
-                    <option value="مجاز">م</option>
+                html += `<select class="status" data-lesson="الدرس ${i}">
+                    <option value="حاضر">ح</option><option value="غائب">غ</option><option value="مجاز">م</option>
                 </select>`;
             }
-            listDiv.innerHTML += row + "</div>";
+            html += `</div>`;
         });
-        document.getElementById('saveBtn').style.display = "block";
+        listDiv.innerHTML = html;
     };
 
     window.saveAll = async () => {
-        const pass = prompt("أدخل كلمة المرور:");
-        if (pass !== SECRET_PASSWORD) return alert("كلمة مرور خاطئة!");
-
-        const rows = document.querySelectorAll('.student-row[data-name]');
+        if (prompt("أدخل كلمة المرور:") !== "138") return alert("خطأ!");
         const date = document.getElementById('date').value;
         const cls = document.getElementById('fClass').value;
-        const sec = document.getElementById('fSection').value;
-
-        for (let row of rows) {
+        document.querySelectorAll('.student-row[data-name]').forEach(row => {
             const name = row.dataset.name;
-            const selects = row.querySelectorAll('.lesson-status');
-            
-            for (let sel of selects) {
-                const status = sel.value;
-                const lesson = sel.dataset.lesson;
-                if (status !== "حاضر") { // نحفظ فقط الغياب والإجازة لتقليل الضغط على قاعدة البيانات
-                    await setDoc(doc(db, "attendance", `${date}_${cls}_${name}_${lesson}`), { 
-                        name, status, date, lesson, class: cls, section: sec 
-                    });
-                }
-            }
-        }
-        alert("تم حفظ السجلات كاملة!");
+            row.querySelectorAll('.status').forEach(sel => {
+                setDoc(doc(db, "attendance", `${date}_${name}_${sel.dataset.lesson}`), {
+                    name, date, class: cls, lesson: sel.dataset.lesson, status: sel.value
+                });
+            });
+        });
+        alert("تم الحفظ!");
     };
 </script>
 </body>

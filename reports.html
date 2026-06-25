@@ -10,7 +10,6 @@
         select, input, button { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; }
         .report-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         .report-table th, .report-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        .absent { background: #f8d7da; } .excused { background: #fff3cd; }
     </style>
 </head>
 <body>
@@ -18,31 +17,23 @@
 <button onclick="window.location.href='index.html'">⬅ العودة للرئيسية</button>
 
 <div class="card" style="border: 2px solid #dc3545;">
-    <h4>⚠️ حذف سجلات مخصص</h4>
-    <div class="grid-row">
-        <input type="date" id="delFrom"><input type="date" id="delTo">
-    </div>
-    <div class="grid-row">
-        <select id="delClass"><option value="">اختر الصف...</option></select>
-        <select id="delSection"><option value="">اختر الشعبة...</option></select>
-    </div>
+    <h4>⚠️ حذف سجلات</h4>
+    <div class="grid-row"><input type="date" id="delFrom"><input type="date" id="delTo"></div>
+    <div class="grid-row"><select id="delClass"><option value="">الصف...</option></select><select id="delSection"><option value="">الشعبة...</option></select></div>
     <button onclick="clearAllData()" style="background:#dc3545; color:white;">تنفيذ الحذف</button>
 </div>
 
 <div class="card">
-    <h4>📋 تقرير الغياب والاجازات اليومي</h4>
+    <h4>📋 تقرير الغياب (يومي)</h4>
     <input type="date" id="dailyDate">
-    <button onclick="fetchDailyTable()" style="background:#28a745; color:white;">عرض الغياب فقط</button>
+    <button onclick="fetchDailyTable()" style="background:#28a745; color:white;">عرض الغياب مجمعاً</button>
 </div>
 
 <div class="card">
     <h4>🔍 تقرير شامل</h4>
     <select id="sClass" onchange="updateSections()"><option value="">الصف...</option></select>
     <select id="sSection"><option value="">الشعبة...</option></select>
-    <div class="grid-row">
-        <input type="date" id="dateFrom"><input type="date" id="dateTo">
-    </div>
-    <select id="sStudent"><option value="all">الكل (تقرير مجمع)</option></select>
+    <div class="grid-row"><input type="date" id="dateFrom"><input type="date" id="dateTo"></div>
     <button onclick="fetchReports()" style="background:#007bff; color:white;">استخراج التقرير</button>
 </div>
 
@@ -92,24 +83,28 @@
         let count = 0;
         snap.forEach(d => {
             const data = d.data();
-            if(data.date >= from && data.date <= to && String(data.class).trim() === cls.trim() && String(data.section).trim() === sec.trim()) {
+            // مطابقة مرنة
+            if(data.date >= from && data.date <= to && String(data.class||'').trim() == cls.trim() && String(data.section||'').trim() == sec.trim()) {
                 batch.delete(d.ref); count++;
             }
         });
-        if(count > 0 && confirm(`تم العثور على ${count} سجل. حذف؟`)) { await batch.commit(); location.reload(); }
-        else alert("لا توجد سجلات مطابقة (تأكد من مطابقة التاريخ والصف بدقة).");
+        if(count > 0 && confirm(`تم العثور على ${count} سجل. هل تريد الحذف؟`)) { await batch.commit(); location.reload(); }
+        else alert("لم يتم العثور على سجلات تطابق التاريخ والصف بدقة.");
     };
 
     window.fetchDailyTable = async () => {
         const date = document.getElementById('dailyDate').value;
         const snap = await getDocs(collection(db, "attendance"));
-        let html = `<h4>تقرير ${date} (الغياب والإجازات فقط)</h4><table class="report-table"><tr><th>الطالب</th><th>الحالة</th></tr>`;
+        let report = {};
         snap.forEach(d => {
             const data = d.data();
             if(data.date === date && (data.status === "غائب" || data.status === "إجازة")) {
-                html += `<tr><td>${data.name} (${data.class}-${data.section})</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
+                if(!report[data.name]) report[data.name] = [];
+                report[data.name].push(data.lesson || "بدون مادة");
             }
         });
+        let html = `<h4>تقرير ${date}</h4><table class="report-table"><tr><th>الطالب</th><th>الحصص الغائب عنها</th></tr>`;
+        for(let name in report) { html += `<tr><td>${name}</td><td>${report[name].join(', ')}</td></tr>`; }
         document.getElementById('res').innerHTML = html + `</table>`;
     };
 
@@ -120,8 +115,8 @@
         let html = `<h4>التقرير الشامل</h4><table class="report-table"><tr><th>التاريخ</th><th>الطالب</th><th>الحالة</th></tr>`;
         snap.forEach(d => {
             const data = d.data();
-            if(String(data.class).trim() === cls.trim() && String(data.section).trim() === sec.trim() && data.date >= dFrom && data.date <= dTo) {
-                html += `<tr><td>${data.date}</td><td>${data.name}</td><td class="${data.status === 'غائب' ? 'absent' : 'excused'}">${data.status}</td></tr>`;
+            if(String(data.class||'').trim() == cls.trim() && String(data.section||'').trim() == sec.trim() && data.date >= dFrom && data.date <= dTo) {
+                html += `<tr><td>${data.date}</td><td>${data.name}</td><td>${data.status}</td></tr>`;
             }
         });
         document.getElementById('res').innerHTML = html + `</table>`;

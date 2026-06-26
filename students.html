@@ -1,27 +1,104 @@
-window.importData = async () => {
-    const text = document.getElementById('importArea').value;
-    const lines = text.trim().split('\n');
-    
-    // سنقوم بتصفية الأسطر الفارغة
-    for (let line of lines) {
-        // تنظيف السطر من الفراغات الزائدة وتقسيمه بناءً على أي مسافة أو Tab
-        const parts = line.split(/\t+/); 
-        
-        // التحقق من أن السطر يحتوي بيانات كافية (الاسم، التولد، رقم القيد)
-        if (parts.length >= 3) {
-            const studentName = parts[0].trim();
-            const birthYear = parts[1].trim();
-            const idNumber = parts[2].trim();
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>إدارة الطلاب الشاملة</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f7f6; }
+        .card { background: white; padding: 15px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        input, select, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { padding: 10px; border: none; border-radius: 5px; cursor: pointer; color: white; width: 100%; font-weight: bold; margin-top: 5px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .btn-add { background: #28a745; }
+        .btn-import { background: #007bff; }
+        .btn-back { background: #6c757d; }
+    </style>
+</head>
+<body>
 
-            await addDoc(collection(db, "students"), {
-                name: studentName,
-                birth: birthYear,
-                id: idNumber,
-                class: "السادس العلمي", // يمكنك جعلها متغيرات لاحقاً
-                section: "د"
-            });
+<a href="index.html"><button class="btn-back">⬅️ العودة للرئيسية</button></a>
+
+<div class="card">
+    <h3>📥 استيراد جماعي (من Word)</h3>
+    <textarea id="importArea" placeholder="انسخ الجدول من الوورد والصقه هنا..."></textarea>
+    <button class="btn-import" onclick="importData()">تحليل واستيراد البيانات</button>
+</div>
+
+<div class="card">
+    <h3>👤 إضافة طالب فردي</h3>
+    <input type="text" id="name" placeholder="اسم الطالب">
+    <button onclick="startDictation()" style="background:#17a2b8;">🎤 إدخال الاسم بالصوت</button>
+    <input type="text" id="idNum" placeholder="رقم القيد">
+    <input type="text" id="birth" placeholder="سنة التولد">
+    <select id="class"><option>السادس العلمي</option><option>الخامس العلمي</option><option>الرابع العلمي</option></select>
+    <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option></select>
+    <button class="btn-add" onclick="saveStudent()">💾 حفظ الطالب</button>
+</div>
+
+<div class="card">
+    <h3>📋 قائمة الطلاب</h3>
+    <table id="studentTable">
+        <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف</th><th>إجراء</th></tr></thead>
+        <tbody id="studentBody"></tbody>
+    </table>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+
+    const db = getFirestore(initializeApp({ /* ضع بيانات الـ config هنا */ }));
+
+    window.startDictation = () => {
+        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        rec.lang = 'ar-IQ';
+        rec.onresult = (e) => { document.getElementById('name').value = e.results[0][0].transcript; };
+        rec.start();
+    };
+
+    window.saveStudent = async () => {
+        await addDoc(collection(db, "students"), {
+            name: document.getElementById('name').value,
+            birth: document.getElementById('birth').value,
+            id: document.getElementById('idNum').value,
+            class: document.getElementById('class').value,
+            section: document.getElementById('section').value
+        });
+        alert("تم الحفظ!");
+        loadStudents();
+    };
+
+    window.importData = async () => {
+        const text = document.getElementById('importArea').value;
+        const lines = text.trim().split('\n');
+        for (let line of lines) {
+            const parts = line.split(/\t+/);
+            if (parts.length >= 3) {
+                await addDoc(collection(db, "students"), {
+                    name: parts[0].trim(), birth: parts[1].trim(), id: parts[2].trim(),
+                    class: "السادس العلمي", section: "د"
+                });
+            }
         }
-    }
-    alert("تم تحليل البيانات وإضافتها بنجاح!");
+        alert("تم الاستيراد!");
+        loadStudents();
+    };
+
+    window.loadStudents = async () => {
+        const snap = await getDocs(collection(db, "students"));
+        const body = document.getElementById('studentBody');
+        body.innerHTML = "";
+        snap.forEach(d => {
+            const dt = d.data();
+            body.innerHTML += `<tr><td>${dt.name}</td><td>${dt.birth}</td><td>${dt.id}</td>
+                <td>${dt.class}/${dt.section}</td>
+                <td><button onclick="deleteStudent('${d.id}')" style="background:red">حذف</button></td></tr>`;
+        });
+    };
+    
+    window.deleteStudent = async (id) => { if(confirm("حذف؟")) { await deleteDoc(doc(db, "students", id)); loadStudents(); } };
     loadStudents();
-};
+</script>
+</body>
+</html>

@@ -48,18 +48,37 @@
         let editingId = null;
 
         window.saveStudent = () => {
+            const name = document.getElementById('name').value;
+            // التحقق من أن الاسم ليس فارغاً
+            if (!name) { alert("⚠️ يرجى إدخال اسم الطالب!"); return; }
+
             const data = { 
-                name: document.getElementById('name').value, 
+                name: name, 
                 birth: document.getElementById('birth').value, 
                 id: document.getElementById('idNum').value, 
                 class: document.getElementById('class').value, 
                 section: document.getElementById('section').value 
             };
+            
             if (editingId) {
-                db.collection("students").doc(editingId).update(data).then(() => { alert("تم التعديل"); editingId = null; document.getElementById('saveBtn').innerText = "💾 حفظ"; loadStudents(); });
+                db.collection("students").doc(editingId).update(data).then(() => { 
+                    alert("✅ تم التعديل"); 
+                    resetForm();
+                    loadStudents(); 
+                });
             } else {
-                db.collection("students").add(data).then(() => { alert("تم الحفظ"); loadStudents(); });
+                db.collection("students").add(data).then(() => { 
+                    alert("✅ تم الحفظ"); 
+                    resetForm();
+                    loadStudents(); 
+                });
             }
+        };
+
+        window.resetForm = () => {
+            editingId = null;
+            document.getElementById('name').value = "";
+            document.getElementById('saveBtn').innerText = "💾 حفظ";
         };
 
         window.loadStudents = () => {
@@ -67,29 +86,31 @@
                 const body = document.getElementById('studentBody'); body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class} - ${d.section}</td>
+                    body.innerHTML += `<tr><td>${d.name || ''}</td><td>${d.birth || ''}</td><td>${d.id || ''}</td><td>${d.class || ''} - ${d.section || ''}</td>
                         <td>
-                            <button onclick="prepareEdit('${doc.id}', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">✏️</button>
-                            <button style="background:red" onclick="secureDelete('${doc.id}')">🗑️</button>
+                            <button onclick="secureAction('${doc.id}', 'edit', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">✏️</button>
+                            <button style="background:red" onclick="secureAction('${doc.id}', 'delete')">🗑️</button>
                         </td></tr>`;
                 });
             });
         };
 
-        window.prepareEdit = (id, n, b, idn, c, s) => {
-            editingId = id;
-            document.getElementById('name').value = n;
-            document.getElementById('birth').value = b;
-            document.getElementById('idNum').value = idn;
-            document.getElementById('class').value = c;
-            document.getElementById('section').value = s;
-            document.getElementById('saveBtn').innerText = "🔄 تحديث";
-        };
-
-        window.secureDelete = (id) => {
-            if (prompt("أدخل كلمة المرور للحذف:") === "1234") {
-                db.collection("students").doc(id).delete().then(loadStudents);
-            } else { alert("كلمة مرور خاطئة"); }
+        window.secureAction = (id, type, n, b, idn, c, s) => {
+            const pass = prompt("🔐 أدخل كلمة المرور للإجراء:");
+            if (pass === "1234") { 
+                if (type === 'delete') {
+                    db.collection("students").doc(id).delete().then(loadStudents);
+                } else if (type === 'edit') {
+                    editingId = id;
+                    document.getElementById('name').value = n;
+                    document.getElementById('birth').value = b;
+                    document.getElementById('idNum').value = idn;
+                    document.getElementById('class').value = c;
+                    document.getElementById('section').value = s;
+                    document.getElementById('saveBtn').innerText = "🔄 تحديث";
+                    window.scrollTo(0,0);
+                }
+            } else { alert("❌ كلمة مرور خاطئة!"); }
         };
 
         window.filterData = () => {

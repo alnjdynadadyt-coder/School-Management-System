@@ -2,85 +2,69 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب الشاملة</title>
+    <title>إدارة الطلاب</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; width: 180px; }
+        button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
+        .btn-delete { background: #dc3545; }
+        .btn-edit { background: #007bff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border-bottom: 1px solid #ddd; padding: 12px; text-align: center; }
+    </style>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <h3>إضافة طالب جديد</h3>
-    <input type="text" id="name" placeholder="اسم الطالب الرباعي">
-    <input type="text" id="birth" placeholder="التولد">
-    <input type="text" id="idNum" placeholder="رقم القيد">
-    
-    <select id="class">
-        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-        <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
-    </select>
-    
-    <select id="section">
-        <option>أ</option><option>ب</option><option>ج</option><option>د</option>
-        <option>هـ</option><option>و</option><option>ز</option>
-    </select>
-    
-    <button onclick="saveStudent()">💾 حفظ الطالب</button>
+    <div class="container">
+        <a href="index.html" style="text-decoration:none; color:#555;">⬅️ العودة للرئيسية</a>
+        <h3>إدارة بيانات الطلاب</h3>
+        <input type="text" id="name" placeholder="اسم الطالب">
+        <input type="text" id="birth" placeholder="التولد">
+        <input type="text" id="idNum" placeholder="القيد">
+        <button onclick="saveStudent()">💾 حفظ / تحديث</button>
 
-    <hr>
-    <h3>قائمة الطلاب (الفلترة)</h3>
-    <select id="fClass" onchange="loadStudents()">
-        <option value="">جميع الصفوف</option>
-        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-        <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
-    </select>
-    
-    <select id="fSection" onchange="loadStudents()">
-        <option value="">جميع الشعب</option>
-        <option>أ</option><option>ب</option><option>ج</option><option>د</option>
-        <option>هـ</option><option>و</option><option>ز</option>
-    </select>
-
-    <table border="1" width="100%" style="margin-top:10px; text-align:center;">
-        <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراء</th></tr></thead>
-        <tbody id="studentBody"></tbody>
-    </table>
+        <table id="studentsTable">
+            <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>إجراءات</th></tr></thead>
+            <tbody id="studentBody"></tbody>
+        </table>
+    </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        let editingId = null;
 
         window.saveStudent = () => {
-            const data = {
-                name: document.getElementById('name').value,
-                birth: document.getElementById('birth').value,
-                id: document.getElementById('idNum').value,
-                class: document.getElementById('class').value,
-                section: document.getElementById('section').value
-            };
-            if(!data.name) return alert("الرجاء كتابة الاسم");
-            db.collection("students").add(data)
-            .then(() => { alert("تم الحفظ!"); loadStudents(); })
-            .catch(e => alert("خطأ: " + e.message));
+            const data = { name: document.getElementById('name').value, birth: document.getElementById('birth').value, id: document.getElementById('idNum').value };
+            if (editingId) {
+                db.collection("students").doc(editingId).update(data).then(() => { editingId = null; loadStudents(); });
+            } else {
+                db.collection("students").add(data).then(loadStudents);
+            }
+        };
+
+        window.editStudent = (id, name, birth, idNum) => {
+            editingId = id;
+            document.getElementById('name').value = name;
+            document.getElementById('birth').value = birth;
+            document.getElementById('idNum').value = idNum;
         };
 
         window.loadStudents = () => {
-            const fClass = document.getElementById('fClass').value;
-            const fSection = document.getElementById('fSection').value;
-            let query = db.collection("students");
-            if(fClass) query = query.where("class", "==", fClass);
-            
-            query.get().then(snap => {
+            db.collection("students").get().then(snap => {
                 const body = document.getElementById('studentBody');
                 body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    if(!fSection || d.section == fSection) {
-                        body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class}/${d.section}</td>
-                        <td><button onclick="deleteStudent('${doc.id}')">❌</button></td></tr>`;
-                    }
+                    body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td>
+                        <td>
+                            <button class="btn-edit" onclick="editStudent('${doc.id}', '${d.name}', '${d.birth}', '${d.id}')">تعديل</button>
+                            <button class="btn-delete" onclick="deleteStudent('${doc.id}')">حذف</button>
+                        </td></tr>`;
                 });
             });
         };
-        
         window.deleteStudent = (id) => { db.collection("students").doc(id).delete().then(loadStudents); };
         loadStudents();
     </script>

@@ -5,6 +5,7 @@
     <title>تسجيل الحضور</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -22,18 +23,19 @@
         <div class="controls">
             <input type="date" id="datePicker" onchange="updateDayName()">
             <input type="text" id="teacherName" placeholder="اسم المدرس">
-            <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
-            <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option></select>
-            <select id="subjectSelect"><option>إسلامية</option><option>عربي</option><option>رياضيات</option></select>
-            <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option></select>
+            <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
+            <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+            <select id="subjectSelect"><option>إسلامية</option><option>عربي</option><option>إنجليزي</option><option>رياضيات</option><option>فيزياء</option><option>كيمياء</option><option>أحياء</option><option>حاسوب</option><option>جغرافية</option><option>تاريخ</option><option>اجتماعيات</option><option>فلسفة</option><option>اقتصاد</option><option>جرائم</option><option>رياضة</option><option>فنية</option><option>أخرى</option></select>
+            <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option><option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option></select>
             <button onclick="loadStudentsForAttendance()" style="grid-column: span 2; background:#28a745; color:white; border:none; padding:10px; border-radius:8px;">جلب الأسماء</button>
         </div>
         <table>
             <thead><tr><th>اسم الطالب</th><th>الحالة</th></tr></thead>
             <tbody id="attendanceBody"></tbody>
         </table>
-        <textarea id="notes" placeholder="ملاحظات..." style="margin-top:10px; width:100%;"></textarea>
+        <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%;"></textarea>
         <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
+        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="exportPDF()">تصدير تقرير PDF</button>
     </div>
 
     <script>
@@ -41,7 +43,6 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 1. استعادة طلب الباسورد
         window.onload = () => {
             if(!sessionStorage.getItem("teacherLoggedIn")) {
                 const pass = prompt("🔐 كلمة مرور المدرس:");
@@ -60,30 +61,52 @@
 
         window.loadStudentsForAttendance = () => {
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
-            db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
-                const body = document.getElementById('attendanceBody'); body.innerHTML = "";
-                snap.forEach((student) => {
-                    body.innerHTML += `<tr><td>${student.data().name}</td>
-                    <td><button class="status-btn" style="background:#28a745" onclick="toggleStatus(this)" data-id="${student.id}">حاضر</button></td></tr>`;
+            db.collection("attendance").doc(docId).get().then(doc => {
+                const isLocked = doc.exists;
+                const savedData = isLocked ? doc.data().data : {};
+                if(isLocked) {
+                    document.getElementById('notes').value = doc.data().notes || "";
+                    document.getElementById('teacherName').value = doc.data().teacher || "";
+                }
+                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
+                    const body = document.getElementById('attendanceBody'); body.innerHTML = "";
+                    snap.forEach((student) => {
+                        const sId = student.id;
+                        const status = isLocked ? (savedData[sId] || "حاضر") : "حاضر";
+                        const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
+                        body.innerHTML += `<tr><td>${student.data().name}</td>
+                        <td><button class="status-btn" style="background:${color}" ${isLocked ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${sId}">${status}</button></td></tr>`;
+                    });
+                    document.getElementById('saveBtn').style.display = isLocked ? "none" : "block";
+                    document.getElementById('pdfBtn').style.display = isLocked ? "block" : "none";
                 });
-                document.getElementById('saveBtn').style.display = "block";
             });
         };
 
-        // 2. إصلاح تبديل الحالة
         window.toggleStatus = (btn) => {
-            if (btn.innerText === "حاضر") { btn.innerText = "غائب"; btn.style.background = "#dc3545"; }
-            else if (btn.innerText === "غائب") { btn.innerText = "مجاز"; btn.style.background = "#ffc107"; }
-            else { btn.innerText = "حاضر"; btn.style.background = "#28a745"; }
+            const states = ["حاضر", "غائب", "مجاز"];
+            const colors = ["#28a745", "#dc3545", "#ffc107"];
+            let idx = states.indexOf(btn.innerText);
+            let next = (idx + 1) % 3;
+            btn.innerText = states[next];
+            btn.style.backgroundColor = colors[next];
         };
 
         window.saveAttendance = () => {
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
-            db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ!");
+            db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
+                alert("✅ تم الحفظ! تم قفل البيانات.");
+                // قفل الأزرار فوراً دون إعادة تحميل
+                document.querySelectorAll('.status-btn').forEach(btn => btn.disabled = true);
+                document.getElementById('saveBtn').style.display = "none";
+                document.getElementById('pdfBtn').style.display = "block";
             });
+        };
+
+        window.exportPDF = () => {
+            alert("للحصول على تقرير ورقي، استخدم Ctrl+P واطبع الصفحة مباشرة!");
         };
     </script>
 </body>

@@ -9,9 +9,10 @@
         .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
         .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .table th { background-color: #f8f9fa; }
-        /* هذا الجزء يخفي الأزرار عند الطباعة */
+        
+        /* إخفاء الأزرار عند الطباعة */
         @media print {
-            button, a, .no-print { display: none !important; }
+            .no-print { display: none !important; }
         }
     </style>
 </head>
@@ -20,8 +21,8 @@
 <div class="card no-print">
     <h3>📋 التقرير اليومي للغياب</h3>
     <input type="date" id="reportDate" style="width:100%; padding:10px; margin-bottom:10px;">
-    <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">عرض التقرير</button>
-    <button onclick="printReport()" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:10px;">طباعة التقرير (PDF)</button>
+    <button id="btnFetch" onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">عرض التقرير</button>
+    <button id="btnPrint" onclick="window.print()" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:10px;">طباعة التقرير (PDF)</button>
 </div>
 
 <div id="reportArea" class="card" style="display:none;">
@@ -51,7 +52,10 @@
         const q = query(collection(db, "attendance"), where("date", "==", date));
         const snap = await getDocs(q);
         
-        if (snap.empty) { container.innerHTML = "لا توجد غيابات مسجلة لهذا التاريخ."; return; }
+        if (snap.empty) { 
+            container.innerHTML = "لا توجد غيابات مسجلة لهذا التاريخ."; 
+            return; 
+        }
 
         let reportData = {};
         snap.forEach(d => {
@@ -62,17 +66,16 @@
             }
         });
 
-        if (Object.keys(reportData).length === 0) { container.innerHTML = "الجميع حاضرون لهذا اليوم!"; return; }
+        if (Object.keys(reportData).length === 0) { 
+            container.innerHTML = "الجميع حاضرون لهذا اليوم!"; 
+            return; 
+        }
 
         let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازة</th></tr>`;
         for (let name in reportData) {
             html += `<tr><td>${name}</td><td>${reportData[name].class}</td><td>${reportData[name].absences.join(' | ')}</td></tr>`;
         }
         container.innerHTML = html + "</table>";
-    };
-
-    window.printReport = () => {
-        window.print();
     };
 </script>
 </body>

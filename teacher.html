@@ -14,12 +14,14 @@
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
-        #backBtn { display: none; margin-bottom: 15px; padding: 10px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; display: inline-block; }
+        /* زر العودة مخفي افتراضياً */
+        #backBtn { display: none; margin-bottom: 15px; padding: 10px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
     </style>
 </head>
 <body>
     <div class="container">
         <a href="index.html" id="backBtn">⬅️ العودة للرئيسية</a>
+        
         <h3>تسجيل الحضور</h3>
         <div class="controls">
             <input type="date" id="datePicker">
@@ -46,13 +48,18 @@
 
         window.onload = () => {
             const isAdmin = sessionStorage.getItem("isAdmin") === "true";
+            
+            // إظهار زر العودة للمدير فقط
             if (isAdmin) {
                 document.getElementById('backBtn').style.display = "inline-block";
-            } else if(!sessionStorage.getItem("teacherLoggedIn")) {
+            } 
+            // طلب كلمة المرور من المدرس فقط
+            else if(!sessionStorage.getItem("teacherLoggedIn")) {
                 const pass = prompt("🔐 كلمة مرور المدرس:");
                 if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
                 sessionStorage.setItem("teacherLoggedIn", "true");
             }
+            
             document.getElementById('datePicker').valueAsDate = new Date();
         };
 

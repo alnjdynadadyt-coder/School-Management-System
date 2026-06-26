@@ -2,89 +2,62 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير اليومي</title>
+    <title>التقرير اليومي للغياب</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
-        .table th { background-color: #f8f9fa; }
-        
-        /* هذا الجزء هو المسؤول عن إخفاء أي عنصر يحمل كلاس no-print عند الطباعة */
-        @media print {
-            .no-print { display: none !important; }
-        }
+        body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .absent { color: #dc3545; font-weight: bold; }
+        .leave { color: #ffc107; font-weight: bold; }
+        @media print { .no-print { display: none; } }
     </style>
 </head>
 <body>
-
-<div class="card no-print">
-    <h3>📋 التقرير اليومي للغياب</h3>
-    <input type="date" id="reportDate" style="width:100%; padding:10px; margin-bottom:10px;">
-    <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">عرض التقرير</button>
-</div>
-
-<div id="reportArea" class="card" style="display:none;">
-    <div id="reportTitle" style="text-align:center; font-weight:bold; margin-bottom:15px; font-size:1.2em;"></div>
-    
-    <div id="tableContainer"></div>
-    
-    <button id="btnPrint" class="no-print" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:20px; cursor:pointer;">طباعة التقرير (PDF)</button>
-</div>
-
-<a href="index.html" style="display:block; text-align:center; margin-top:20px; color:#555;" class="no-print">← العودة للرئيسية</a>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
-
-    document.getElementById('reportDate').valueAsDate = new Date();
-
-    window.generateReport = async () => {
-        const dateVal = document.getElementById('reportDate').value;
-        const container = document.getElementById('tableContainer');
-        const titleDiv = document.getElementById('reportTitle');
-        document.getElementById('reportArea').style.display = "block";
-        container.innerHTML = "جاري الجلب...";
-
-        // حساب اليوم والتاريخ
-        const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-        const d = new Date(dateVal);
-        const dayName = days[d.getDay()];
-        titleDiv.innerHTML = `التقرير اليومي ليوم ${dayName} الموافق ${dateVal}`;
-
-        const q = query(collection(db, "attendance"), where("date", "==", dateVal));
-        const snap = await getDocs(q);
+    <div class="container">
+        <h3>التقرير اليومي للغياب</h3>
+        <input type="date" id="datePicker" onchange="loadDailyReport()">
         
-        if (snap.empty) { container.innerHTML = "لا توجد غيابات مسجلة لهذا التاريخ."; return; }
+        <div id="stats" style="margin: 20px 0; font-weight: bold;"></div>
 
-        let reportData = {};
-        snap.forEach(d => {
-            const data = d.data();
-            if (data.status !== "حاضر") {
-                if (!reportData[data.name]) reportData[data.name] = { class: data.class, absences: [] };
-                reportData[data.name].absences.push(`${data.lesson}: ${data.status}`);
-            }
-        });
+        <table id="reportTable">
+            <thead>
+                <tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>الدروس</th></tr>
+            </thead>
+            <tbody id="reportBody"></tbody>
+        </table>
+        <button class="no-print" onclick="window.print()" style="margin-top:20px; padding:10px; width:100%;">طباعة التقرير (PDF)</button>
+    </div>
 
-        if (Object.keys(reportData).length === 0) { container.innerHTML = "الجميع حاضرون لهذا اليوم!"; return; }
+    <script>
+        const db = firebase.firestore();
+        
+        async function loadDailyReport() {
+            const date = document.getElementById('datePicker').value;
+            const reportBody = document.getElementById('reportBody');
+            reportBody.innerHTML = "";
+            
+            // جلب كل سجلات الحضور لهذا اليوم
+            const snap = await db.collection("attendance").where("date", "==", date).get(); // ملاحظة: تأكد من تخزين حقل التاريخ في كل مستند
+            
+            let studentsData = {};
 
-        let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازة</th></tr>`;
-        for (let name in reportData) {
-            html += `<tr><td>${name}</td><td>${reportData[name].class}</td><td>${reportData[name].absences.join(' | ')}</td></tr>`;
+            snap.forEach(doc => {
+                const data = doc.data().data;
+                for (let studentId in data) {
+                    if (data[studentId] !== "حاضر") {
+                        if (!studentsData[studentId]) {
+                            studentsData[studentId] = { name: "...", classes: [] }; // سنحتاج ربط اسم الطالب
+                        }
+                        studentsData[studentId].classes.push(`${doc.data().lesson}: ${data[studentId]}`);
+                    }
+                }
+            });
+
+            // عرض البيانات في الجدول...
         }
-        container.innerHTML = html + "</table>";
-    };
-        document.getElementById('btnPrint').addEventListener('click', () => {
-        window.print();
-    });
-
-</script>
+    </script>
 </body>
 </html>

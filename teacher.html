@@ -48,9 +48,13 @@
                 if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
                 sessionStorage.setItem("teacherLoggedIn", "true");
             }
-            // ضبط التاريخ دائماً على اليوم الحالي
-            const today = new Date();
-            document.getElementById('datePicker').valueAsDate = today;
+            
+            // فرض التاريخ الحالي
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const day = String(now.getDate()).padStart(2, '0');
+            document.getElementById('datePicker').value = `${year}-${month}-${day}`;
             updateDayName();
         };
 
@@ -72,7 +76,6 @@
                     document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
 
-                // تم إزالة orderBy لضمان عدم حدوث خطأ الفهرسة
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {

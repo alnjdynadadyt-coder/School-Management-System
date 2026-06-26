@@ -10,31 +10,24 @@
         button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        #importArea { display: none; margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 10px; }
     </style>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <a href="index.html" style="text-decoration:none;">⬅️ العودة للرئيسية</a>
-        <h3>إضافة/تعديل طالب</h3>
+        <a href="index.html">⬅️ العودة للرئيسية</a>
+        <h3>إدارة بيانات الطلاب</h3>
         
-        <input type="text" id="name" placeholder="الاسم الرباعي">
-        <select id="birth"><script>for(let i=2000; i<=2035; i++) document.write(`<option>${i}</option>`);</script></select>
-        <input type="text" id="idNum" placeholder="رقم القيد">
-        <select id="class">
-            <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-            <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
-        </select>
-        <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
-        <button id="saveBtn" onclick="saveStudent()">💾 حفظ</button>
+        <button onclick="document.getElementById('importArea').style.display='block'">📥 استيراد أسماء من الورد</button>
+        
+        <div id="importArea">
+            <textarea id="pasteArea" style="width:100%; height:100px;" placeholder="الصق هنا الأسماء المنسوخة من ملف الورد (كل طالب في سطر)..."></textarea>
+            <button onclick="importStudents()" style="background:#007bff;">بدء الاستيراد</button>
+        </div>
 
         <hr>
-        <h3>بحث وفلترة</h3>
-        <input type="text" id="searchBar" onkeyup="filterData()" placeholder="🔍 ابحث بالاسم...">
-        <select id="fClass" onchange="filterData()"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
-        <select id="fSection" onchange="filterData()"><option value="">كل الشعب</option><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
-
         <table id="studentsTable">
             <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراءات</th></tr></thead>
             <tbody id="studentBody"></tbody>
@@ -45,40 +38,20 @@
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        let editingId = null;
 
-        window.saveStudent = () => {
-            const name = document.getElementById('name').value;
-            // التحقق من أن الاسم ليس فارغاً
-            if (!name) { alert("⚠️ يرجى إدخال اسم الطالب!"); return; }
-
-            const data = { 
-                name: name, 
-                birth: document.getElementById('birth').value, 
-                id: document.getElementById('idNum').value, 
-                class: document.getElementById('class').value, 
-                section: document.getElementById('section').value 
-            };
-            
-            if (editingId) {
-                db.collection("students").doc(editingId).update(data).then(() => { 
-                    alert("✅ تم التعديل"); 
-                    resetForm();
-                    loadStudents(); 
-                });
-            } else {
-                db.collection("students").add(data).then(() => { 
-                    alert("✅ تم الحفظ"); 
-                    resetForm();
-                    loadStudents(); 
-                });
-            }
-        };
-
-        window.resetForm = () => {
-            editingId = null;
-            document.getElementById('name').value = "";
-            document.getElementById('saveBtn').innerText = "💾 حفظ";
+        // دالة استيراد البيانات
+        window.importStudents = () => {
+            const text = document.getElementById('pasteArea').value;
+            const lines = text.split('\n');
+            lines.forEach(line => {
+                const parts = line.split('\t'); // الورد غالباً يستخدم Tab للفصل
+                if(parts.length >= 3) {
+                    const data = { name: parts[0], birth: parts[1], id: parts[2], class: "السادس العلمي", section: "د" };
+                    db.collection("students").add(data);
+                }
+            });
+            alert("تم إرسال البيانات للاستيراد!");
+            loadStudents();
         };
 
         window.loadStudents = () => {
@@ -86,43 +59,15 @@
                 const body = document.getElementById('studentBody'); body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    body.innerHTML += `<tr><td>${d.name || ''}</td><td>${d.birth || ''}</td><td>${d.id || ''}</td><td>${d.class || ''} - ${d.section || ''}</td>
-                        <td>
-                            <button onclick="secureAction('${doc.id}', 'edit', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">✏️</button>
-                            <button style="background:red" onclick="secureAction('${doc.id}', 'delete')">🗑️</button>
-                        </td></tr>`;
+                    body.innerHTML += `<tr><td>${d.name||''}</td><td>${d.birth||''}</td><td>${d.id||''}</td><td>${d.class||''}</td><td><button onclick="secureDelete('${doc.id}')">🗑️</button></td></tr>`;
                 });
             });
         };
 
-        window.secureAction = (id, type, n, b, idn, c, s) => {
-            const pass = prompt("🔐 أدخل كلمة المرور للإجراء:");
-            if (pass === "1234") { 
-                if (type === 'delete') {
-                    db.collection("students").doc(id).delete().then(loadStudents);
-                } else if (type === 'edit') {
-                    editingId = id;
-                    document.getElementById('name').value = n;
-                    document.getElementById('birth').value = b;
-                    document.getElementById('idNum').value = idn;
-                    document.getElementById('class').value = c;
-                    document.getElementById('section').value = s;
-                    document.getElementById('saveBtn').innerText = "🔄 تحديث";
-                    window.scrollTo(0,0);
-                }
-            } else { alert("❌ كلمة مرور خاطئة!"); }
+        window.secureDelete = (id) => {
+            if(prompt("كلمة المرور:") === "1234") db.collection("students").doc(id).delete().then(loadStudents);
         };
-
-        window.filterData = () => {
-            const nameF = document.getElementById('searchBar').value.toLowerCase();
-            const classF = document.getElementById('fClass').value;
-            const secF = document.getElementById('fSection').value;
-            const rows = document.querySelectorAll('#studentBody tr');
-            rows.forEach(row => {
-                const txt = row.innerText.toLowerCase();
-                row.style.display = (txt.includes(nameF) && (classF === "" || txt.includes(classF)) && (secF === "" || txt.includes(secF))) ? "" : "none";
-            });
-        };
+        
         loadStudents();
     </script>
 </body>

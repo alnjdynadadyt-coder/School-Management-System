@@ -2,28 +2,30 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب</title>
+    <title>إدارة الطلاب الشاملة</title>
     <style>
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; width: 180px; }
+        input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; width: 150px; }
         button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
         .btn-delete { background: #dc3545; }
         .btn-edit { background: #007bff; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border-bottom: 1px solid #ddd; padding: 12px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
     </style>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
-        <a href="index.html" style="text-decoration:none; color:#555;">⬅️ العودة للرئيسية</a>
+        <a href="index.html">⬅️ العودة للرئيسية</a>
         <h3>إدارة بيانات الطلاب</h3>
         <input type="text" id="name" placeholder="اسم الطالب">
         <input type="text" id="birth" placeholder="التولد">
         <input type="text" id="idNum" placeholder="القيد">
         <button onclick="saveStudent()">💾 حفظ / تحديث</button>
+        
+        <input type="text" id="searchBar" onkeyup="filterStudents()" placeholder="🔍 ابحث عن طالب..." style="width: 100%; margin-top:10px;">
 
         <table id="studentsTable">
             <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>إجراءات</th></tr></thead>
@@ -32,23 +34,18 @@
     </div>
 
     <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         let editingId = null;
 
         window.saveStudent = () => {
             const data = { name: document.getElementById('name').value, birth: document.getElementById('birth').value, id: document.getElementById('idNum').value };
-            if (editingId) {
+            if(editingId) {
                 db.collection("students").doc(editingId).update(data).then(() => { editingId = null; loadStudents(); });
             } else {
                 db.collection("students").add(data).then(loadStudents);
             }
-        };
-
-        window.editStudent = (id, name, birth, idNum) => {
-            editingId = id;
-            document.getElementById('name').value = name;
-            document.getElementById('birth').value = birth;
-            document.getElementById('idNum').value = idNum;
         };
 
         window.loadStudents = () => {
@@ -65,7 +62,25 @@
                 });
             });
         };
+
+        window.editStudent = (id, name, birth, idNum) => {
+            editingId = id;
+            document.getElementById('name').value = name;
+            document.getElementById('birth').value = birth;
+            document.getElementById('idNum').value = idNum;
+        };
+
         window.deleteStudent = (id) => { db.collection("students").doc(id).delete().then(loadStudents); };
+
+        window.filterStudents = () => {
+            const input = document.getElementById('searchBar').value.toLowerCase();
+            const rows = document.querySelectorAll('#studentBody tr');
+            rows.forEach(row => {
+                const name = row.getElementsByTagName('td')[0].innerText.toLowerCase();
+                row.style.display = name.includes(input) ? "" : "none";
+            });
+        };
+        
         loadStudents();
     </script>
 </body>

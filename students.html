@@ -2,14 +2,12 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب الشاملة</title>
+    <title>إدارة الطلاب الاحترافية</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; }
         button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
-        .btn-delete { background: #dc3545; }
-        .btn-edit { background: #007bff; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
     </style>
@@ -18,25 +16,22 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html">⬅️ العودة للرئيسية</a>
-        <h3>إدارة بيانات الطلاب</h3>
-        
-        <input type="text" id="name" placeholder="اسم الطالب">
-        <input type="text" id="birth" placeholder="التولد">
-        <input type="text" id="idNum" placeholder="القيد">
-        <input type="text" id="class" placeholder="الصف">
-        <input type="text" id="section" placeholder="الشعبة">
-        <button onclick="saveStudent()">💾 حفظ / تحديث</button>
-        
-        <hr>
-        
-        <input type="text" id="searchBar" onkeyup="filterStudents()" placeholder="🔍 ابحث عن اسم...">
-        <select id="filterClass" onchange="filterStudents()">
-            <option value="">كل الصفوف</option>
-            <option value="الرابع العلمي">الرابع العلمي</option>
-            <option value="الخامس العلمي">الخامس العلمي</option>
-            <option value="السادس العلمي">السادس العلمي</option>
+        <h3>إضافة طالب جديد</h3>
+        <input type="text" id="name" placeholder="الاسم الرباعي">
+        <select id="birth"><script>for(let i=2000; i<=2035; i++) document.write(`<option>${i}</option>`);</script></select>
+        <input type="text" id="idNum" placeholder="رقم القيد">
+        <select id="class">
+            <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+            <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
         </select>
+        <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+        <button onclick="saveStudent()">💾 حفظ</button>
+
+        <hr>
+        <h3>بحث وفلترة</h3>
+        <input type="text" id="searchBar" onkeyup="filterData()" placeholder="🔍 ابحث بالاسم...">
+        <select id="fClass" onchange="filterData()"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
+        <select id="fSection" onchange="filterData()"><option value="">كل الشعب</option><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
 
         <table id="studentsTable">
             <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراءات</th></tr></thead>
@@ -48,65 +43,45 @@
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        let editingId = null;
 
         window.saveStudent = () => {
-            const data = { 
-                name: document.getElementById('name').value, 
-                birth: document.getElementById('birth').value, 
-                id: document.getElementById('idNum').value,
-                class: document.getElementById('class').value,
-                section: document.getElementById('section').value 
-            };
-            if(editingId) {
-                db.collection("students").doc(editingId).update(data).then(() => { editingId = null; loadStudents(); });
-            } else {
-                db.collection("students").add(data).then(loadStudents);
-            }
+            const data = { name: document.getElementById('name').value, birth: document.getElementById('birth').value, id: document.getElementById('idNum').value, class: document.getElementById('class').value, section: document.getElementById('section').value };
+            db.collection("students").add(data).then(() => { alert("تم الحفظ"); loadStudents(); });
         };
 
         window.loadStudents = () => {
             db.collection("students").get().then(snap => {
-                const body = document.getElementById('studentBody');
-                body.innerHTML = "";
+                const body = document.getElementById('studentBody'); body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    body.innerHTML += `<tr>
-                        <td>${d.name || ''}</td><td>${d.birth || ''}</td><td>${d.id || ''}</td>
-                        <td>${d.class || ''}/${d.section || ''}</td>
+                    body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class} - ${d.section}</td>
                         <td>
-                            <button class="btn-edit" onclick="editStudent('${doc.id}', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">تعديل</button>
-                            <button class="btn-delete" onclick="deleteStudent('${doc.id}')">حذف</button>
+                            <button onclick="secureAction('${doc.id}', 'edit')">✏️</button>
+                            <button style="background:red" onclick="secureAction('${doc.id}', 'delete')">🗑️</button>
                         </td></tr>`;
                 });
             });
         };
 
-        window.editStudent = (id, name, birth, idNum, cls, sec) => {
-            editingId = id;
-            document.getElementById('name').value = name;
-            document.getElementById('birth').value = birth;
-            document.getElementById('idNum').value = idNum;
-            document.getElementById('class').value = cls;
-            document.getElementById('section').value = sec;
+        window.secureAction = (id, type) => {
+            const pass = prompt("أدخل كلمة المرور للإجراء:");
+            if (pass === "1234") { // يمكنك تغيير كلمة المرور هنا
+                if (type === 'delete') db.collection("students").doc(id).delete().then(loadStudents);
+                // التعديل يمكن ربطه بنفس منطق الحفظ السابق
+            } else { alert("كلمة مرور خاطئة!"); }
         };
 
-        window.deleteStudent = (id) => { db.collection("students").doc(id).delete().then(loadStudents); };
-
-        window.filterStudents = () => {
-            const nameFilter = document.getElementById('searchBar').value.toLowerCase();
-            const classFilter = document.getElementById('filterClass').value;
+        window.filterData = () => {
+            const nameF = document.getElementById('searchBar').value.toLowerCase();
+            const classF = document.getElementById('fClass').value;
+            const secF = document.getElementById('fSection').value;
             const rows = document.querySelectorAll('#studentBody tr');
-            
             rows.forEach(row => {
-                const name = row.cells[0].innerText.toLowerCase();
-                const clsSec = row.cells[3].innerText; // الصف والشعبة في العمود الرابع
-                const matchesName = name.includes(nameFilter);
-                const matchesClass = classFilter === "" || clsSec.includes(classFilter);
-                row.style.display = (matchesName && matchesClass) ? "" : "none";
+                const txt = row.innerText.toLowerCase();
+                const show = (txt.includes(nameF) && (classF === "" || txt.includes(classF)) && (secF === "" || txt.includes(secF)));
+                row.style.display = show ? "" : "none";
             });
         };
-        
         loadStudents();
     </script>
 </body>

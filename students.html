@@ -25,11 +25,6 @@
     <button id="saveBtn" onclick="saveStudent()" style="background:#28a745; color:white;">💾 حفظ</button>
 
     <hr>
-    <h3>فلترة دقيقة</h3>
-    <input type="text" id="searchName" onkeyup="filterData()" placeholder="بحث بالاسم...">
-    <select id="filterClass" onchange="filterData()"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
-    <select id="filterSection" onchange="filterData()"><option value="">كل الشعب</option><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
-
     <table>
         <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف</th><th>الشعبة</th><th>إجراءات</th></tr></thead>
         <tbody id="studentBody"></tbody>
@@ -37,10 +32,9 @@
 </div>
 
 <script>
-    const firebaseConfig = { /* أضف بياناتك هنا */ };
+    const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
     if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
-    let editingId = null;
 
     window.saveStudent = () => {
         const data = {
@@ -50,13 +44,7 @@
             class: document.getElementById('class').value,
             section: document.getElementById('section').value
         };
-        if(!data.name) return alert("أدخل الاسم");
-        
-        if(editingId) {
-            db.collection("students").doc(editingId).update(data).then(() => { editingId=null; document.getElementById('saveBtn').innerText="💾 حفظ"; loadStudents(); });
-        } else {
-            db.collection("students").add(data).then(loadStudents);
-        }
+        db.collection("students").add(data).then(() => { alert("تم الحفظ"); loadStudents(); });
     };
 
     window.loadStudents = () => {
@@ -64,42 +52,16 @@
             const body = document.getElementById('studentBody'); body.innerHTML = "";
             snap.forEach(doc => {
                 const d = doc.data();
-                body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class}</td><td>${d.section}</td>
-                <td>
-                    <button onclick="editMode('${doc.id}', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">✏️</button>
-                    <button onclick="deleteStudent('${doc.id}')" style="background:red; color:white;">🗑️</button>
-                </td></tr>`;
+                body.innerHTML += `<tr><td>${d.name||''}</td><td>${d.birth||''}</td><td>${d.id||''}</td><td>${d.class||''}</td><td>${d.section||''}</td>
+                <td><button onclick="deleteStudent('${doc.id}')" style="background:red; color:white;">🗑️</button></td></tr>`;
             });
-        });
-    };
-
-    window.editMode = (id, n, b, i, c, s) => {
-        if(prompt("كلمة المرور:") !== "1234") return alert("خطأ");
-        editingId = id;
-        document.getElementById('name').value = n;
-        document.getElementById('birth').value = b;
-        document.getElementById('idNum').value = i;
-        document.getElementById('class').value = c;
-        document.getElementById('section').value = s;
-        document.getElementById('saveBtn').innerText = "🔄 تحديث";
+        }).catch(err => alert("حدث خطأ في جلب البيانات: " + err));
     };
 
     window.deleteStudent = (id) => {
         if(prompt("كلمة المرور:") === "1234") db.collection("students").doc(id).delete().then(loadStudents);
     };
 
-    window.filterData = () => {
-        const n = document.getElementById('searchName').value.toLowerCase();
-        const c = document.getElementById('filterClass').value;
-        const s = document.getElementById('filterSection').value;
-        
-        document.querySelectorAll('#studentBody tr').forEach(row => {
-            const name = row.cells[0].innerText.toLowerCase();
-            const cls = row.cells[3].innerText;
-            const sec = row.cells[4].innerText;
-            row.style.display = (name.includes(n) && (c === "" || cls === c) && (s === "" || sec === s)) ? "" : "none";
-        });
-    };
     loadStudents();
 </script>
 </body>

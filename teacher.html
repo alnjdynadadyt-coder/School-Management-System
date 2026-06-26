@@ -105,9 +105,15 @@
             });
         };
 
-        window.exportPDF = () => {
-            alert("للحصول على تقرير ورقي، استخدم Ctrl+P واطبع الصفحة مباشرة!");
+                window.exportPDF = () => {
+            document.getElementById('saveBtn').style.display = "none";
+            document.getElementById('pdfBtn').style.display = "none";
+            window.print();
+            setTimeout(() => {
+                document.getElementById('pdfBtn').style.display = "block";
+            }, 1000);
         };
+
     </script>
 </body>
 </html>

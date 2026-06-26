@@ -10,7 +10,7 @@
         .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .table th { background-color: #f8f9fa; }
         
-        /* هذا التعديل البسيط لإخفاء الأزرار عند الطباعة فقط */
+        /* هذا الجزء هو السر في إخفاء الأزرار عند الطباعة */
         @media print {
             .no-print { display: none !important; }
         }
@@ -22,11 +22,11 @@
     <h3>📋 التقرير اليومي للغياب</h3>
     <input type="date" id="reportDate" style="width:100%; padding:10px; margin-bottom:10px;">
     <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">عرض التقرير</button>
-    <button onclick="printReport()" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:10px;">طباعة التقرير (PDF)</button>
+    <button onclick="window.print()" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:10px;">طباعة التقرير (PDF)</button>
 </div>
 
-<div id="reportArea" class="card">
-    <div id="reportTitle" style="text-align:center; font-weight:bold; margin-bottom:15px;"></div>
+<div id="reportArea" class="card" style="display:none;">
+    <div id="titleContainer" style="text-align:center; font-weight:bold; margin-bottom:10px;"></div>
     <div id="tableContainer"></div>
 </div>
 
@@ -45,18 +45,18 @@
     document.getElementById('reportDate').valueAsDate = new Date();
 
     window.generateReport = async () => {
-        const dateInput = document.getElementById('reportDate').value;
+        const dateVal = document.getElementById('reportDate').value;
         const container = document.getElementById('tableContainer');
-        const titleDiv = document.getElementById('reportTitle');
-        
-        // إعداد التاريخ واليوم
-        const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-        const d = new Date(dateInput);
-        const dayName = days[d.getDay()];
-        titleDiv.innerText = `تقرير يوم ${dayName} الموافق ${dateInput}`;
-
+        const titleDiv = document.getElementById('titleContainer');
+        document.getElementById('reportArea').style.display = "block";
         container.innerHTML = "جاري الجلب...";
-        const q = query(collection(db, "attendance"), where("date", "==", dateInput));
+
+        // حساب اليوم والتاريخ
+        const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
+        const d = new Date(dateVal);
+        titleDiv.innerHTML = `التقرير اليومي ليوم ${days[d.getDay()]} الموافق ${dateVal}`;
+
+        const q = query(collection(db, "attendance"), where("date", "==", dateVal));
         const snap = await getDocs(q);
         
         if (snap.empty) { container.innerHTML = "لا توجد غيابات مسجلة لهذا التاريخ."; return; }
@@ -64,21 +64,22 @@
         let reportData = {};
         snap.forEach(d => {
             const data = d.data();
+            const name = data.name || "غير معروف";
+            const cls = data.class || "غير محدد";
+            
             if (data.status !== "حاضر") {
-                if (!reportData[data.name]) reportData[data.name] = { class: data.class, absences: [] };
-                reportData[data.name].absences.push(`${data.lesson}: ${data.status}`);
+                if (!reportData[name]) reportData[name] = { class: cls, absences: [] };
+                reportData[name].absences.push(`${data.lesson}: ${data.status}`);
             }
         });
+
+        if (Object.keys(reportData).length === 0) { container.innerHTML = "الجميع حاضرون لهذا اليوم!"; return; }
 
         let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازة</th></tr>`;
         for (let name in reportData) {
             html += `<tr><td>${name}</td><td>${reportData[name].class}</td><td>${reportData[name].absences.join(' | ')}</td></tr>`;
         }
         container.innerHTML = html + "</table>";
-    };
-
-    window.printReport = () => {
-        window.print();
     };
 </script>
 </body>

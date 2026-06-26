@@ -10,7 +10,7 @@
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         select, input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
-        .status-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; color: white; cursor: pointer; font-weight: bold; }
+        .status-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; color: white; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
@@ -21,9 +21,16 @@
         <h3>تسجيل الحضور اليومي</h3>
         <div class="controls">
             <input type="date" id="datePicker">
-            <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
-            <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option><option>د</option></select>
-            <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option><option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option></select>
+            <select id="classSelect">
+                <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+            </select>
+            <select id="sectionSelect">
+                <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>و</option><option>ز</option>
+            </select>
+            <select id="lessonSelect">
+                <option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option>
+                <option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option>
+            </select>
             <button onclick="loadStudentsForAttendance()" style="grid-column: span 2; background:#28a745; color:white; border:none; padding:10px; border-radius:8px;">جلب الأسماء</button>
         </div>
         <table>
@@ -38,16 +45,17 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // الحماية
         window.onload = () => {
-            const pass = prompt("🔐 كلمة مرور المدرس:");
-            if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
+            // بقاء تسجيل الدخول لمدة الجلسة
+            if(!sessionStorage.getItem("teacherLoggedIn")) {
+                const pass = prompt("🔐 كلمة مرور المدرس:");
+                if (pass !== "123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
+                sessionStorage.setItem("teacherLoggedIn", "true");
+            }
             document.getElementById('datePicker').valueAsDate = new Date();
         };
 
-        // تبديل الألوان
         window.toggleStatus = (btn) => {
-            if(btn.disabled) return;
             const states = ["حاضر", "غائب", "مجاز"];
             const colors = ["#28a745", "#dc3545", "#ffc107"];
             let idx = states.indexOf(btn.innerText);
@@ -56,43 +64,32 @@
             btn.style.backgroundColor = colors[next];
         };
 
-        // جلب البيانات
         window.loadStudentsForAttendance = () => {
-            const cls = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
-            const lesson = document.getElementById('lessonSelect').value;
-            const date = document.getElementById('datePicker').value;
-            const docId = `${date}_${cls}_${sec}_${lesson}`;
-
+            const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
+            
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
-                db.collection("students").where("class", "==", cls).where("section", "==", sec).get().then(snap => {
+                const savedData = isLocked ? doc.data().data : null;
+
+                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student, index) => {
-                        const status = isLocked ? doc.data().data[index] : "حاضر";
+                        const status = isLocked ? savedData[index] : "حاضر";
                         const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
                         body.innerHTML += `<tr><td>${student.data().name}</td>
                         <td><button class="status-btn" style="background:${color}" ${isLocked ? 'disabled' : ''} onclick="toggleStatus(this)">${status}</button></td></tr>`;
                     });
                     document.getElementById('saveBtn').style.display = isLocked ? "none" : "block";
-                    if(isLocked) alert("⚠️ هذا الدرس مقفل بالفعل!");
                 });
             });
         };
 
-        // الحفظ مع القفل
         window.saveAttendance = () => {
-            const cls = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
-            const lesson = document.getElementById('lessonSelect').value;
-            const date = document.getElementById('datePicker').value;
-            const docId = `${date}_${cls}_${sec}_${lesson}`;
-            
-            const attendanceData = {};
-            document.querySelectorAll('.status-btn').forEach((btn, i) => attendanceData[i] = btn.innerText);
-
-            db.collection("attendance").doc(docId).set({ data: attendanceData }).then(() => {
-                alert("✅ تم قفل وحفظ الحضور!");
+            const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
+            const data = {};
+            document.querySelectorAll('.status-btn').forEach((btn, i) => data[i] = btn.innerText);
+            db.collection("attendance").doc(docId).set({ data }).then(() => {
+                alert("✅ تم الحفظ بنجاح!");
                 location.reload();
             });
         };

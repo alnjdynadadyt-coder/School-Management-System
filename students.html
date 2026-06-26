@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <title>إدارة الطلاب الشاملة</title>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f0f2f5; padding: 20px; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-        input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; width: 150px; }
+        input, select { padding: 10px; margin: 5px; border: 1px solid #ddd; border-radius: 8px; }
         button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
         .btn-delete { background: #dc3545; }
         .btn-edit { background: #007bff; }
@@ -20,15 +20,26 @@
     <div class="container">
         <a href="index.html">⬅️ العودة للرئيسية</a>
         <h3>إدارة بيانات الطلاب</h3>
+        
         <input type="text" id="name" placeholder="اسم الطالب">
         <input type="text" id="birth" placeholder="التولد">
         <input type="text" id="idNum" placeholder="القيد">
+        <input type="text" id="class" placeholder="الصف">
+        <input type="text" id="section" placeholder="الشعبة">
         <button onclick="saveStudent()">💾 حفظ / تحديث</button>
         
-        <input type="text" id="searchBar" onkeyup="filterStudents()" placeholder="🔍 ابحث عن طالب..." style="width: 100%; margin-top:10px;">
+        <hr>
+        
+        <input type="text" id="searchBar" onkeyup="filterStudents()" placeholder="🔍 ابحث عن اسم...">
+        <select id="filterClass" onchange="filterStudents()">
+            <option value="">كل الصفوف</option>
+            <option value="الرابع العلمي">الرابع العلمي</option>
+            <option value="الخامس العلمي">الخامس العلمي</option>
+            <option value="السادس العلمي">السادس العلمي</option>
+        </select>
 
         <table id="studentsTable">
-            <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>إجراءات</th></tr></thead>
+            <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراءات</th></tr></thead>
             <tbody id="studentBody"></tbody>
         </table>
     </div>
@@ -40,7 +51,13 @@
         let editingId = null;
 
         window.saveStudent = () => {
-            const data = { name: document.getElementById('name').value, birth: document.getElementById('birth').value, id: document.getElementById('idNum').value };
+            const data = { 
+                name: document.getElementById('name').value, 
+                birth: document.getElementById('birth').value, 
+                id: document.getElementById('idNum').value,
+                class: document.getElementById('class').value,
+                section: document.getElementById('section').value 
+            };
             if(editingId) {
                 db.collection("students").doc(editingId).update(data).then(() => { editingId = null; loadStudents(); });
             } else {
@@ -54,30 +71,39 @@
                 body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td>
+                    body.innerHTML += `<tr>
+                        <td>${d.name || ''}</td><td>${d.birth || ''}</td><td>${d.id || ''}</td>
+                        <td>${d.class || ''}/${d.section || ''}</td>
                         <td>
-                            <button class="btn-edit" onclick="editStudent('${doc.id}', '${d.name}', '${d.birth}', '${d.id}')">تعديل</button>
+                            <button class="btn-edit" onclick="editStudent('${doc.id}', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">تعديل</button>
                             <button class="btn-delete" onclick="deleteStudent('${doc.id}')">حذف</button>
                         </td></tr>`;
                 });
             });
         };
 
-        window.editStudent = (id, name, birth, idNum) => {
+        window.editStudent = (id, name, birth, idNum, cls, sec) => {
             editingId = id;
             document.getElementById('name').value = name;
             document.getElementById('birth').value = birth;
             document.getElementById('idNum').value = idNum;
+            document.getElementById('class').value = cls;
+            document.getElementById('section').value = sec;
         };
 
         window.deleteStudent = (id) => { db.collection("students").doc(id).delete().then(loadStudents); };
 
         window.filterStudents = () => {
-            const input = document.getElementById('searchBar').value.toLowerCase();
+            const nameFilter = document.getElementById('searchBar').value.toLowerCase();
+            const classFilter = document.getElementById('filterClass').value;
             const rows = document.querySelectorAll('#studentBody tr');
+            
             rows.forEach(row => {
-                const name = row.getElementsByTagName('td')[0].innerText.toLowerCase();
-                row.style.display = name.includes(input) ? "" : "none";
+                const name = row.cells[0].innerText.toLowerCase();
+                const clsSec = row.cells[3].innerText; // الصف والشعبة في العمود الرابع
+                const matchesName = name.includes(nameFilter);
+                const matchesClass = classFilter === "" || clsSec.includes(classFilter);
+                row.style.display = (matchesName && matchesClass) ? "" : "none";
             });
         };
         

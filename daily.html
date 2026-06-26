@@ -1,70 +1,28 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقرير اليومي</title>
-    <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
-        .table th { background-color: #f8f9fa; }
-    </style>
-</head>
-<body>
+<button onclick="printReport()" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:10px;">طباعة التقرير (PDF)</button>
 
-<div class="card">
-    <h3>📋 التقرير اليومي للغياب</h3>
-    <input type="date" id="reportDate" style="width:100%; padding:10px; margin-bottom:10px;">
-    <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">عرض التقرير</button>
-</div>
-
-<div id="reportArea" class="card" style="display:none;">
-    <div id="tableContainer"></div>
-</div>
-
-<a href="index.html" style="display:block; text-align:center; margin-top:20px; color:#555;">← العودة للرئيسية</a>
-
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    
-    const db = getFirestore(initializeApp({
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865",
-        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
-    }));
-
-    document.getElementById('reportDate').valueAsDate = new Date();
-
-    window.generateReport = async () => {
+<script>
+    // أضف هذه الدالة في قسم السكريبت
+    window.printReport = () => {
         const date = document.getElementById('reportDate').value;
-        const container = document.getElementById('tableContainer');
-        document.getElementById('reportArea').style.display = "block";
-        container.innerHTML = "جاري الجلب...";
-
-        const q = query(collection(db, "attendance"), where("date", "==", date));
-        const snap = await getDocs(q);
-        
-        if (snap.empty) { container.innerHTML = "لا توجد غيابات مسجلة لهذا التاريخ."; return; }
-
-        let reportData = {};
-        snap.forEach(d => {
-            const data = d.data();
-            if (data.status !== "حاضر") {
-                if (!reportData[data.name]) reportData[data.name] = { class: data.class, absences: [] };
-                reportData[data.name].absences.push(`${data.lesson}: ${data.status}`);
-            }
-        });
-
-        if (Object.keys(reportData).length === 0) { container.innerHTML = "الجميع حاضرون لهذا اليوم!"; return; }
-
-        let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>الغياب/الإجازة</th></tr>`;
-        for (let name in reportData) {
-            html += `<tr><td>${name}</td><td>${reportData[name].class}</td><td>${reportData[name].absences.join(' | ')}</td></tr>`;
-        }
-        container.innerHTML = html + "</table>";
+        const printWindow = window.open('', '_blank');
+        printWindow.document.write(`
+            <html dir="rtl">
+            <head>
+                <title>تقرير الغيابات - ${date}</title>
+                <style>
+                    body { font-family: sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                    th, td { border: 1px solid #000; padding: 10px; text-align: center; }
+                    h2 { text-align: center; }
+                </style>
+            </head>
+            <body>
+                <h2>تقرير الغيابات والإجازات ليوم ${date}</h2>
+                ${document.getElementById('tableContainer').innerHTML}
+            </body>
+            </html>
+        `);
+        printWindow.document.close();
+        printWindow.print();
     };
 </script>
-</body>
-</html>

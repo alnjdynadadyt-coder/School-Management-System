@@ -70,7 +70,7 @@
                     document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
 
-                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
+                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).orderBy("name").get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {
                         const sId = student.id;

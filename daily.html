@@ -3,63 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <title>التقرير اليومي الموثوق</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
         body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
-        .table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        .table th, .table td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        .g { color: red; font-weight: bold; }
-        .m { color: #856404; font-weight: bold; }
-        .btn-group { display: flex; gap: 10px; }
+        .card { background: white; padding: 20px; border-radius: 10px; margin-bottom: 20px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
+        .table th { background-color: #f8f9fa; }
+        .btn-action { background: #007bff; color: white; padding: 12px; border: none; border-radius: 6px; width: 100%; font-weight: bold; cursor: pointer; }
+        .back-btn { display: block; text-align: center; margin-top: 20px; color: #555; text-decoration: none; font-size: 16px; }
     </style>
 </head>
 <body>
 
 <div class="card">
-    <h3>📋 تقرير الغيابات والإجازات اليومي</h3>
-    <input type="date" id="reportDate">
-    <button onclick="generateReport()" style="background:#007bff; color:white; padding:10px; border:none; width:100%;">استخراج التقرير لهذا اليوم</button>
+    <h3>📋 التقرير اليومي الموثوق</h3>
+    <input type="date" id="reportDate" style="width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ddd; border-radius: 4px;">
+    <button class="btn-action" onclick="generateReport()">عرض التقرير لهذا اليوم</button>
 </div>
 
-<div id="reportArea" class="card">
+<div id="reportArea" class="card" style="display:none;">
     <div id="tableContainer"></div>
 </div>
+
+<a href="index.html" class="back-btn">← العودة للرئيسية</a>
 
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
     import { getFirestore, collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
     
-    const db = getFirestore(initializeApp({ /* ضع بياناتك هنا */ }));
+    // تأكد من استخدام بياناتك الخاصة هنا
+    const db = getFirestore(initializeApp({
+        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+        projectId: "school-manager-d1865",
+        appId: "1:752295259069:web:cb0824a579e714bb77c0d4"
+    }));
+
+    document.getElementById('reportDate').valueAsDate = new Date();
 
     window.generateReport = async () => {
         const date = document.getElementById('reportDate').value;
-        const listDiv = document.getElementById('tableContainer');
-        listDiv.innerHTML = "جاري تجميع البيانات...";
+        const container = document.getElementById('tableContainer');
+        const area = document.getElementById('reportArea');
+        
+        container.innerHTML = "جاري الجلب...";
+        area.style.display = "block";
 
         const q = query(collection(db, "attendance"), where("date", "==", date));
         const snap = await getDocs(q);
         
-        let report = {};
-        snap.forEach(d => {
-            const data = d.data();
-            // لا نعرض الحاضرين في التقرير اليومي، فقط الغائب والمجاز
-            if (data.status !== "حاضر") {
-                if (!report[data.name]) report[data.name] = { cls: data.class, lessons: [] };
-                report[data.name].lessons.push(`${data.lesson} (${data.status === 'غائب' ? 'غ' : 'م'})`);
-            }
-        });
-
-        if (Object.keys(report).length === 0) {
-            listDiv.innerHTML = "لا توجد حالات غياب أو إجازة مسجلة لهذا التاريخ.";
+        if (snap.empty) {
+            container.innerHTML = "<p style='text-align:center;'>لا توجد بيانات مسجلة لهذا التاريخ.</p>";
             return;
         }
 
-        let html = `<table class="table"><tr><th>اسم الطالب</th><th>الصف</th><th>الدروس المسجلة</th></tr>`;
-        for (let name in report) {
-            html += `<tr><td>${name}</td><td>${report[name].cls}</td><td>${report[name].lessons.join(' - ')}</td></tr>`;
+        let reportData = {};
+        snap.forEach(d => {
+            const data = d.data();
+            if (!reportData[data.name]) reportData[data.name] = { class: data.class, status: {} };
+            reportData[data.name].status[data.lesson] = data.status;
+        });
+
+        let html = `<table class="table"><tr><th>الطالب</th><th>الصف</th><th>د1</th><th>د2</th><th>د3</th><th>د4</th><th>د5</th><th>د6</th></tr>`;
+        
+        for (let name in reportData) {
+            html += `<tr><td>${name}</td><td>${reportData[name].class}</td>`;
+            for(let i=1; i<=6; i++) {
+                let stat = reportData[name].status[`الدرس ${i}`] || "-";
+                html += `<td>${stat}</td>`;
+            }
+            html += `</tr>`;
         }
-        listDiv.innerHTML = html + "</table>";
+        container.innerHTML = html + "</table>";
     };
 </script>
 </body>

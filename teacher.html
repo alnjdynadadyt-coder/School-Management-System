@@ -20,7 +20,6 @@
 <body>
     <div class="container">
         <a href="index.html" id="backBtn">⬅️ العودة للرئيسية</a>
-        
         <h3>تسجيل الحضور (<span id="dayName"></span>)</h3>
         <div class="controls">
             <input type="date" id="datePicker" onchange="updateDayName()">
@@ -36,8 +35,8 @@
             <tbody id="attendanceBody"></tbody>
         </table>
         <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%;"></textarea>
-        <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
-        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="exportPDF()">تصدير تقرير PDF</button>
+        <button id="saveBtn" class="btn-save" onclick="saveAttendance()">إرسال/تحديث الحضور</button>
+        <button id="pdfBtn" class="btn-save" style="background:#dc3545;" onclick="exportPDF()">تصدير تقرير PDF</button>
     </div>
 
     <script>
@@ -45,25 +44,19 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // التحقق من الصلاحيات
         window.onload = () => {
             const isAdmin = sessionStorage.getItem("isAdmin") === "true";
-            
-            if (!isAdmin) {
+            if (isAdmin) {
+                document.getElementById('backBtn').style.display = "inline-block";
+            } else {
                 if(!sessionStorage.getItem("teacherLoggedIn")) {
                     const pass = prompt("🔐 كلمة مرور المدرس:");
                     if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
                     sessionStorage.setItem("teacherLoggedIn", "true");
                 }
-            } else {
-                document.getElementById('backBtn').style.display = "inline-block";
             }
-            
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            document.getElementById('datePicker').value = `${year}-${month}-${day}`;
+            document.getElementById('datePicker').value = now.toISOString().split('T')[0];
             updateDayName();
         };
 
@@ -78,13 +71,11 @@
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
                 const savedData = isLocked ? doc.data().data : {};
-                
                 if(isLocked) {
                     document.getElementById('notes').value = doc.data().notes || "";
                     document.getElementById('teacherName').value = doc.data().teacher || "";
                     document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
-
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {
@@ -92,10 +83,8 @@
                         const status = isLocked ? (savedData[sId] || "حاضر") : "حاضر";
                         const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
                         body.innerHTML += `<tr><td>${student.data().name}</td>
-                        <td><button class="status-btn" style="background:${color}" ${isLocked ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${sId}">${status}</button></td></tr>`;
+                        <td><button class="status-btn" style="background:${color}" onclick="toggleStatus(this)" data-id="${sId}">${status}</button></td></tr>`;
                     });
-                    document.getElementById('saveBtn').style.display = isLocked ? "none" : "block";
-                    document.getElementById('pdfBtn').style.display = isLocked ? "block" : "none";
                 });
             });
         };
@@ -114,21 +103,11 @@
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
             db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ! تم قفل البيانات.");
-                document.querySelectorAll('.status-btn').forEach(btn => btn.disabled = true);
-                document.getElementById('saveBtn').style.display = "none";
-                document.getElementById('pdfBtn').style.display = "block";
+                alert("✅ تم الحفظ بنجاح!");
             });
         };
 
-        window.exportPDF = () => {
-            document.getElementById('saveBtn').style.display = "none";
-            document.getElementById('pdfBtn').style.display = "none";
-            window.print();
-            setTimeout(() => {
-                document.getElementById('pdfBtn').style.display = "block";
-            }, 1000);
-        };
+        window.exportPDF = () => { window.print(); };
     </script>
 </body>
 </html>

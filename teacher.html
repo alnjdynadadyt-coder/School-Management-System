@@ -5,7 +5,6 @@
     <title>تسجيل الحضور</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -64,13 +63,13 @@
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
                 const savedData = isLocked ? doc.data().data : {};
-                            if(isLocked) {
-                document.getElementById('notes').value = doc.data().notes || "";
-                document.getElementById('teacherName').value = doc.data().teacher || "";
-                // أضف هذا السطر هنا:
-                document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
-            }
+                
+                if(isLocked) {
+                    document.getElementById('notes').value = doc.data().notes || "";
+                    document.getElementById('teacherName').value = doc.data().teacher || "";
+                    document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
+
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {
@@ -101,14 +100,13 @@
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
             db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
                 alert("✅ تم الحفظ! تم قفل البيانات.");
-                // قفل الأزرار فوراً دون إعادة تحميل
                 document.querySelectorAll('.status-btn').forEach(btn => btn.disabled = true);
                 document.getElementById('saveBtn').style.display = "none";
                 document.getElementById('pdfBtn').style.display = "block";
             });
         };
 
-                window.exportPDF = () => {
+        window.exportPDF = () => {
             document.getElementById('saveBtn').style.display = "none";
             document.getElementById('pdfBtn').style.display = "none";
             window.print();
@@ -116,7 +114,6 @@
                 document.getElementById('pdfBtn').style.display = "block";
             }, 1000);
         };
-
     </script>
 </body>
 </html>

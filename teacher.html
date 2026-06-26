@@ -5,11 +5,12 @@
     <title>تسجيل الحضور</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        select, input { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
+        select, input, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
         .status-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; color: white; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
@@ -18,15 +19,19 @@
 </head>
 <body>
     <div class="container">
-        <h3>تسجيل الحضور اليومي (<span id="dayName"></span>)</h3>
+        <h3>تسجيل الحضور (<span id="dayName"></span>)</h3>
         <div class="controls">
             <input type="date" id="datePicker" onchange="updateDayName()">
+            <input type="text" id="teacherName" placeholder="اسم المدرس">
             <select id="classSelect">
                 <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
                 <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
             </select>
             <select id="sectionSelect">
                 <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option>
+            </select>
+            <select id="subjectSelect">
+                <option>إسلامية</option><option>عربي</option><option>إنجليزي</option><option>رياضيات</option><option>فيزياء</option><option>كيمياء</option>
             </select>
             <select id="lessonSelect">
                 <option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option>
@@ -38,6 +43,7 @@
             <thead><tr><th>اسم الطالب</th><th>الحالة</th></tr></thead>
             <tbody id="attendanceBody"></tbody>
         </table>
+        <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%; box-sizing:border-box;"></textarea>
         <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
     </div>
 
@@ -67,6 +73,8 @@
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
                 const savedData = isLocked ? doc.data().data : {};
+                if(isLocked) document.getElementById('notes').value = doc.data().notes || "";
+                if(isLocked) document.getElementById('teacherName').value = doc.data().teacher || "";
 
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
@@ -95,7 +103,12 @@
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
-            db.collection("attendance").doc(docId).set({ data }).then(() => {
+            db.collection("attendance").doc(docId).set({ 
+                data, 
+                teacher: document.getElementById('teacherName').value,
+                subject: document.getElementById('subjectSelect').value,
+                notes: document.getElementById('notes').value
+            }).then(() => {
                 alert("✅ تم الحفظ!");
                 location.reload();
             });

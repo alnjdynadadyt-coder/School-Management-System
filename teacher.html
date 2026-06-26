@@ -23,23 +23,14 @@
         <div class="controls">
             <input type="date" id="datePicker" onchange="updateDayName()">
             <input type="text" id="teacherName" placeholder="اسم المدرس">
-            <select id="classSelect">
-                <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
-                <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
-            </select>
-            <select id="sectionSelect">
-                <option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option>
-            </select>
+            <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
+            <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
             <select id="subjectSelect">
-                <option>إسلامية</option><option>عربي</option><option>إنجليزي</option><option>رياضيات</option><option>فيزياء</option>
-                <option>كيمياء</option><option>أحياء</option><option>حاسوب</option><option>جغرافية</option><option>تاريخ</option>
-                <option>اجتماعيات</option><option>فلسفة</option><option>اقتصاد</option><option>جرائم</option><option>رياضة</option>
-                <option>فنية</option><option>أخرى</option>
+                <option>إسلامية</option><option>عربي</option><option>إنجليزي</option><option>رياضيات</option><option>فيزياء</option><option>كيمياء</option>
+                <option>أحياء</option><option>حاسوب</option><option>جغرافية</option><option>تاريخ</option><option>اجتماعيات</option>
+                <option>فلسفة</option><option>اقتصاد</option><option>جرائم</option><option>رياضة</option><option>فنية</option><option>أخرى</option>
             </select>
-            <select id="lessonSelect">
-                <option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option>
-                <option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option>
-            </select>
+            <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option><option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option></select>
             <button onclick="loadStudentsForAttendance()" style="grid-column: span 2; background:#28a745; color:white; border:none; padding:10px; border-radius:8px;">جلب الأسماء</button>
         </div>
         <table>
@@ -48,7 +39,7 @@
         </table>
         <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%; box-sizing:border-box;"></textarea>
         <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
-        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="exportPDF()">تصدير PDF</button>
+        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="exportPDF()">تصدير PDF (التقرير)</button>
     </div>
 
     <script>
@@ -56,32 +47,19 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // دالة لعرض التاريخ واليوم
         function updateDayName() {
             const date = new Date(document.getElementById('datePicker').value);
             const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
             document.getElementById('dayName').innerText = days[date.getDay()];
         }
 
-        window.onload = () => {
-            if(!sessionStorage.getItem("teacherLoggedIn")) {
-                const pass = prompt("🔐 كلمة مرور المدرس:");
-                if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
-                sessionStorage.setItem("teacherLoggedIn", "true");
-            }
-            document.getElementById('datePicker').valueAsDate = new Date();
-            updateDayName();
-        };
-
         window.loadStudentsForAttendance = () => {
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
                 const savedData = isLocked ? doc.data().data : {};
-                if(isLocked) {
-                    document.getElementById('notes').value = doc.data().notes || "";
-                    document.getElementById('teacherName').value = doc.data().teacher || "";
-                }
-
+                
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {
@@ -97,32 +75,35 @@
             });
         };
 
-        window.toggleStatus = (btn) => {
-            const states = ["حاضر", "غائب", "مجاز"];
-            const colors = ["#28a745", "#dc3545", "#ffc107"];
-            let idx = states.indexOf(btn.innerText);
-            let next = (idx + 1) % 3;
-            btn.innerText = states[next];
-            btn.style.backgroundColor = colors[next];
-        };
-
         window.saveAttendance = () => {
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
-            db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ!");
-                location.reload();
+            
+            db.collection("attendance").doc(docId).set({ 
+                data, 
+                teacher: document.getElementById('teacherName').value, 
+                subject: document.getElementById('subjectSelect').value, 
+                notes: document.getElementById('notes').value 
+            }).then(() => {
+                alert("✅ تم الحفظ بنجاح!");
+                // بدلاً من reload، سنقوم فقط بقفل الأزرار وإظهار زر الـ PDF
+                document.querySelectorAll('.status-btn').forEach(btn => btn.disabled = true);
+                document.getElementById('saveBtn').style.display = "none";
+                document.getElementById('pdfBtn').style.display = "block";
             });
         };
 
         window.exportPDF = () => {
+            alert("ملاحظة: لضمان ظهور الخطوط العربية، تأكد من استخدام متصفح يدعم الترميز، أو سنقوم في الخطوة القادمة ببرمجة لوحة تحكم تعرض البيانات مباشرة كجدول HTML مرتب للطباعة.");
+            // بساطة التصدير الحالي للبيانات النصية
             const { jsPDF } = window.jspdf;
             const doc = new jsPDF();
-            doc.text("تقرير الحضور والغياب", 100, 10, {align: 'center'});
-            doc.text(`التاريخ: ${datePicker.value} | المادة: ${subjectSelect.value}`, 10, 20);
-            doc.text(`المدرس: ${teacherName.value}`, 10, 30);
-            doc.save("Attendance.pdf");
+            doc.text("تقرير الحضور والغياب", 105, 10, {align: 'center'});
+            doc.text(`التاريخ: ${datePicker.value}`, 20, 30);
+            doc.text(`المدرس: ${teacherName.value}`, 20, 40);
+            doc.text(`المادة: ${subjectSelect.value}`, 20, 50);
+            doc.save("Attendance_Report.pdf");
         };
     </script>
 </body>

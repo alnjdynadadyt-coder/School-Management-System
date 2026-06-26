@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب الاحترافية</title>
+    <title>إدارة الطلاب الشاملة</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
@@ -10,7 +10,7 @@
         button { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; color: white; background: #28a745; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        #importArea { display: none; margin-top: 20px; padding: 15px; background: #e9ecef; border-radius: 10px; }
+        #importArea { display: none; margin-top: 20px; padding: 15px; background: #fff3cd; border: 1px solid #ffeeba; border-radius: 10px; }
     </style>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -18,16 +18,29 @@
 <body>
     <div class="container">
         <a href="index.html">⬅️ العودة للرئيسية</a>
-        <h3>إدارة بيانات الطلاب</h3>
         
-        <button onclick="document.getElementById('importArea').style.display='block'">📥 استيراد أسماء من الورد</button>
-        
-        <div id="importArea">
-            <textarea id="pasteArea" style="width:100%; height:100px;" placeholder="الصق هنا الأسماء المنسوخة من ملف الورد (كل طالب في سطر)..."></textarea>
-            <button onclick="importStudents()" style="background:#007bff;">بدء الاستيراد</button>
+        <h3>إضافة/تعديل طالب</h3>
+        <input type="text" id="name" placeholder="الاسم الرباعي">
+        <select id="birth"><script>for(let i=2000; i<=2035; i++) document.write(`<option>${i}</option>`);</script></select>
+        <input type="text" id="idNum" placeholder="رقم القيد">
+        <select id="class"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
+        <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+        <button id="saveBtn" onclick="saveStudent()">💾 حفظ</button>
+
+        <div style="margin-top:15px;">
+            <button onclick="toggleImport()" style="background:#17a2b8;">📥 استيراد من الورد</button>
+            <div id="importArea">
+                <textarea id="pasteArea" style="width:100%; height:80px;" placeholder="الصق بيانات الجدول هنا..."></textarea>
+                <button onclick="importStudents()" style="background:#007bff;">تنفيذ الاستيراد</button>
+            </div>
         </div>
 
         <hr>
+        <h3>بحث وفلترة</h3>
+        <input type="text" id="searchBar" onkeyup="filterData()" placeholder="🔍 ابحث بالاسم...">
+        <select id="fClass" onchange="filterData()"><option value="">كل الصفوف</option><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
+        <select id="fSection" onchange="filterData()"><option value="">كل الشعب</option><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
+
         <table id="studentsTable">
             <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراءات</th></tr></thead>
             <tbody id="studentBody"></tbody>
@@ -38,36 +51,63 @@
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        let editingId = null;
 
-        // دالة استيراد البيانات
+        function toggleImport() { document.getElementById('importArea').style.display = (document.getElementById('importArea').style.display === 'block') ? 'none' : 'block'; }
+
+        window.saveStudent = () => {
+            const name = document.getElementById('name').value;
+            if (!name) { alert("⚠️ يرجى إدخال اسم الطالب!"); return; }
+            const data = { name, birth: document.getElementById('birth').value, id: document.getElementById('idNum').value, class: document.getElementById('class').value, section: document.getElementById('section').value };
+            
+            if (editingId) {
+                db.collection("students").doc(editingId).update(data).then(() => { alert("✅ تم التعديل"); resetForm(); loadStudents(); });
+            } else {
+                db.collection("students").add(data).then(() => { alert("✅ تم الحفظ"); resetForm(); loadStudents(); });
+            }
+        };
+
         window.importStudents = () => {
-            const text = document.getElementById('pasteArea').value;
-            const lines = text.split('\n');
+            const lines = document.getElementById('pasteArea').value.split('\n');
             lines.forEach(line => {
-                const parts = line.split('\t'); // الورد غالباً يستخدم Tab للفصل
-                if(parts.length >= 3) {
-                    const data = { name: parts[0], birth: parts[1], id: parts[2], class: "السادس العلمي", section: "د" };
-                    db.collection("students").add(data);
+                const p = line.split('\t');
+                if(p.length >= 2) {
+                    db.collection("students").add({ name: p[0], birth: p[1] || "2000", id: p[2] || "", class: "السادس العلمي", section: "د" });
                 }
             });
-            alert("تم إرسال البيانات للاستيراد!");
-            loadStudents();
+            alert("تم إرسال البيانات للمعالجة، يرجى الانتظار قليلاً ثم تحديث الصفحة.");
         };
+
+        window.resetForm = () => { editingId = null; document.getElementById('name').value = ""; document.getElementById('saveBtn').innerText = "💾 حفظ"; };
 
         window.loadStudents = () => {
             db.collection("students").get().then(snap => {
                 const body = document.getElementById('studentBody'); body.innerHTML = "";
                 snap.forEach(doc => {
                     const d = doc.data();
-                    body.innerHTML += `<tr><td>${d.name||''}</td><td>${d.birth||''}</td><td>${d.id||''}</td><td>${d.class||''}</td><td><button onclick="secureDelete('${doc.id}')">🗑️</button></td></tr>`;
+                    body.innerHTML += `<tr><td>${d.name||''}</td><td>${d.birth||''}</td><td>${d.id||''}</td><td>${d.class||''} - ${d.section||''}</td>
+                        <td><button onclick="secureAction('${doc.id}', 'edit', '${d.name}', '${d.birth}', '${d.id}', '${d.class}', '${d.section}')">✏️</button>
+                        <button style="background:red" onclick="secureAction('${doc.id}', 'delete')">🗑️</button></td></tr>`;
                 });
             });
         };
 
-        window.secureDelete = (id) => {
-            if(prompt("كلمة المرور:") === "1234") db.collection("students").doc(id).delete().then(loadStudents);
+        window.secureAction = (id, type, n, b, idn, c, s) => {
+            if (prompt("🔐 أدخل كلمة المرور:") === "1234") {
+                if (type === 'delete') db.collection("students").doc(id).delete().then(loadStudents);
+                else { editingId = id; document.getElementById('name').value = n; document.getElementById('birth').value = b; document.getElementById('idNum').value = idn; document.getElementById('saveBtn').innerText = "🔄 تحديث"; window.scrollTo(0,0); }
+            } else { alert("❌ كلمة مرور خاطئة!"); }
         };
-        
+
+        window.filterData = () => {
+            const nameF = document.getElementById('searchBar').value.toLowerCase();
+            const classF = document.getElementById('fClass').value;
+            const secF = document.getElementById('fSection').value;
+            document.querySelectorAll('#studentBody tr').forEach(row => {
+                const txt = row.innerText.toLowerCase();
+                row.style.display = (txt.includes(nameF) && (classF === "" || txt.includes(classF)) && (secF === "" || txt.includes(secF))) ? "" : "none";
+            });
+        };
         loadStudents();
     </script>
 </body>

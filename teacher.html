@@ -48,7 +48,9 @@
                 if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
                 sessionStorage.setItem("teacherLoggedIn", "true");
             }
-            document.getElementById('datePicker').valueAsDate = new Date();
+            // ضبط التاريخ دائماً على اليوم الحالي
+            const today = new Date();
+            document.getElementById('datePicker').valueAsDate = today;
             updateDayName();
         };
 
@@ -70,7 +72,8 @@
                     document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
 
-                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).orderBy("name").get().then(snap => {
+                // تم إزالة orderBy لضمان عدم حدوث خطأ الفهرسة
+                db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach((student) => {
                         const sId = student.id;

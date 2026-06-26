@@ -2,51 +2,70 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>إدارة الطلاب المتقدمة</title>
+    <title>إدارة الطلاب الشاملة</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <h3>إضافة طالب</h3>
-    <input type="text" id="name" placeholder="اسم الطالب">
+    <h3>إضافة طالب جديد</h3>
+    <input type="text" id="name" placeholder="اسم الطالب الرباعي">
     <input type="text" id="birth" placeholder="التولد">
     <input type="text" id="idNum" placeholder="رقم القيد">
-    <select id="class"><option>السادس العلمي</option><option>الخامس العلمي</option></select>
-    <select id="section"><option>أ</option><option>ب</option><option>ج</option><option>د</option></select>
+    
+    <select id="class">
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
+    </select>
+    
+    <select id="section">
+        <option>أ</option><option>ب</option><option>ج</option><option>د</option>
+        <option>هـ</option><option>و</option><option>ز</option>
+    </select>
+    
     <button onclick="saveStudent()">💾 حفظ الطالب</button>
 
     <hr>
-    <h3>عرض الطلاب (فلترة)</h3>
+    <h3>قائمة الطلاب (الفلترة)</h3>
     <select id="fClass" onchange="loadStudents()">
-        <option value="">جميع الصفوف</option><option>السادس العلمي</option><option>الخامس العلمي</option>
+        <option value="">جميع الصفوف</option>
+        <option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option>
+        <option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option>
     </select>
+    
     <select id="fSection" onchange="loadStudents()">
-        <option value="">جميع الشعب</option><option>أ</option><option>ب</option><option>ج</option><option>د</option>
+        <option value="">جميع الشعب</option>
+        <option>أ</option><option>ب</option><option>ج</option><option>د</option>
+        <option>هـ</option><option>و</option><option>ز</option>
     </select>
 
-    <table border="1" width="100%">
-        <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th></tr></thead>
+    <table border="1" width="100%" style="margin-top:10px; text-align:center;">
+        <thead><tr><th>الاسم</th><th>التولد</th><th>القيد</th><th>الصف/الشعبة</th><th>إجراء</th></tr></thead>
         <tbody id="studentBody"></tbody>
     </table>
 
     <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
         window.saveStudent = () => {
-            db.collection("students").add({
+            const data = {
                 name: document.getElementById('name').value,
                 birth: document.getElementById('birth').value,
                 id: document.getElementById('idNum').value,
                 class: document.getElementById('class').value,
                 section: document.getElementById('section').value
-            }).then(() => { alert("تم الحفظ!"); loadStudents(); });
+            };
+            if(!data.name) return alert("الرجاء كتابة الاسم");
+            db.collection("students").add(data)
+            .then(() => { alert("تم الحفظ!"); loadStudents(); })
+            .catch(e => alert("خطأ: " + e.message));
         };
 
         window.loadStudents = () => {
             const fClass = document.getElementById('fClass').value;
             const fSection = document.getElementById('fSection').value;
             let query = db.collection("students");
-            
             if(fClass) query = query.where("class", "==", fClass);
             
             query.get().then(snap => {
@@ -55,11 +74,14 @@
                 snap.forEach(doc => {
                     const d = doc.data();
                     if(!fSection || d.section == fSection) {
-                        body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class}/${d.section}</td></tr>`;
+                        body.innerHTML += `<tr><td>${d.name}</td><td>${d.birth}</td><td>${d.id}</td><td>${d.class}/${d.section}</td>
+                        <td><button onclick="deleteStudent('${doc.id}')">❌</button></td></tr>`;
                     }
                 });
             });
         };
+        
+        window.deleteStudent = (id) => { db.collection("students").doc(id).delete().then(loadStudents); };
         loadStudents();
     </script>
 </body>

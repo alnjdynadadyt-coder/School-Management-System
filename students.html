@@ -3,78 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <title>إدارة الطلاب</title>
-    <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-
-    const firebaseConfig = {
-        apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
-        projectId: "school-manager-d1865"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    // دالة الحفظ
-    window.saveStudent = async () => {
-        try {
-            await addDoc(collection(db, "students"), {
-                name: document.getElementById('name').value,
-                birth: document.getElementById('birth').value,
-                id: document.getElementById('idNum').value,
-                class: document.getElementById('class').value,
-                section: document.getElementById('section').value
-            });
-            alert("تم الحفظ!");
-            loadStudents();
-        } catch (e) { alert("خطأ: " + e.message); }
-    };
-
-    // دالة الاستيراد
-    window.importData = async () => {
-        const text = document.getElementById('importArea').value;
-        const lines = text.trim().split('\n');
-        for (let line of lines) {
-            const parts = line.split('\t');
-            if (parts.length >= 3) {
-                await addDoc(collection(db, "students"), {
-                    name: parts[0], birth: parts[1], id: parts[2],
-                    class: "السادس العلمي", section: "د"
-                });
-            }
-        }
-        alert("تم الاستيراد!");
-        loadStudents();
-    };
-
-    // دالة العرض
-    window.loadStudents = async () => {
-        const snap = await getDocs(collection(db, "students"));
-        const body = document.getElementById('studentBody');
-        body.innerHTML = "";
-        snap.forEach(d => {
-            const dt = d.data();
-            body.innerHTML += `<tr><td>${dt.name}</td><td>${dt.birth}</td><td>${dt.id}</td>
-                <td>${dt.class}/${dt.section}</td>
-                <td><button onclick="deleteStudent('${d.id}')">حذف</button></td></tr>`;
-        });
-    };
-
-    window.deleteStudent = async (id) => { await deleteDoc(doc(db, "students", id)); loadStudents(); };
-
-    window.startDictation = () => {
-        const rec = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-        rec.lang = 'ar-IQ';
-        rec.onresult = (e) => { document.getElementById('name').value = e.results[0][0].transcript; };
-        rec.start();
-    };
-
-    loadStudents();
-</script>
-
-    </script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
-    <a href="index.html"><button>⬅️ العودة للرئيسية</button></a>
-    </body>
+    <input type="text" id="name" placeholder="اسم الطالب">
+    <button onclick="saveData()">حفظ الطالب</button>
+    <div id="status" style="color:red;"></div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8",
+            projectId: "school-manager-d1865"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        window.saveData = () => {
+            const name = document.getElementById('name').value;
+            db.collection("students").add({ name: name })
+            .then(() => { alert("تم الحفظ بنجاح!"); })
+            .catch((error) => { alert("خطأ: " + error.message); });
+        };
+    </script>
+</body>
 </html>

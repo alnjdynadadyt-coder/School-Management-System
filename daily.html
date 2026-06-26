@@ -29,7 +29,7 @@
     
     <div id="tableContainer"></div>
     
-    <button onclick="window.print()" class="no-print" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:20px; cursor:pointer;">طباعة التقرير (PDF)</button>
+    <button id="btnPrint" class="no-print" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:20px; cursor:pointer;">طباعة التقرير (PDF)</button>
 </div>
 
 <a href="index.html" style="display:block; text-align:center; margin-top:20px; color:#555;" class="no-print">← العودة للرئيسية</a>
@@ -81,6 +81,10 @@
         }
         container.innerHTML = html + "</table>";
     };
+        document.getElementById('btnPrint').addEventListener('click', () => {
+        window.print();
+    });
+
 </script>
 </body>
 </html>

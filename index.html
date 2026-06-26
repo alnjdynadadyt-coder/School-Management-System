@@ -3,8 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <title>لوحة تحكم المدرسة</title>
+    <script>
+        // تعريفك كمدير للنظام ليفتح النظام بدون باسورد
+        sessionStorage.setItem("isAdmin", "true");
+    </script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; text-align: center; }
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f4f9; text-align: center; }
         .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; max-width: 600px; margin: auto; }
         .nav-btn { display: block; padding: 20px; font-size: 16px; border-radius: 10px; color: white; text-decoration: none; font-weight: bold; }
         .bg-blue { background: #007bff; }

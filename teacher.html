@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>تسجيل الحضور</title>
+    <title>تسجيل الحضور - المدرس</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; padding: 20px; }
         .container { max-width: 600px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -13,67 +13,10 @@
         th, td { border: 1px solid #eee; padding: 12px; text-align: center; }
         .save-btn { width: 100%; padding: 15px; background: #007bff; color: white; border: none; border-radius: 10px; margin-top: 20px; font-size: 16px; cursor: pointer; }
     </style>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
         <h3>تسجيل الحضور اليومي</h3>
-        <div class="top-controls">
-            <input type="date" id="datePicker">
-            <div id="dayDisplay" style="padding: 10px; background: #eee; border-radius: 8px; text-align: center;"></div>
-            <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option></select>
-            <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option><option>د</option></select>
-            <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option></select>
-            <button onclick="loadStudentsForAttendance()" style="background:#28a745; color:white; border:none; border-radius:8px;">جلب الأسماء</button>
         </div>
-        <table>
-            <thead><tr><th>اسم الطالب</th><th>الحالة</th></tr></thead>
-            <tbody id="attendanceBody"></tbody>
-        </table>
-        <button id="saveBtn" class="save-btn" style="display:none;" onclick="saveAttendance()">حفظ الحضور</button>
-    </div>
-
-    <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        window.onload = () => {
-            const pass = prompt("🔐 كلمة مرور المدرس:");
-            if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
-            const now = new Date();
-            document.getElementById('datePicker').valueAsDate = now;
-            const dayNames = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-            document.getElementById('dayDisplay').innerText = dayNames[now.getDay()];
-        };
-
-        window.toggleStatus = (btn) => {
-            const states = ["حاضر", "غائب", "مجاز"];
-            const colors = ["#28a745", "#dc3545", "#ffc107"];
-            let idx = states.indexOf(btn.innerText);
-            let next = (idx + 1) % 3;
-            btn.innerText = states[next];
-            btn.style.backgroundColor = colors[next];
-        };
-
-        window.loadStudentsForAttendance = () => {
-            const cls = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
-            db.collection("students").where("class", "==", cls).where("section", "==", sec).get().then(snap => {
-                const body = document.getElementById('attendanceBody'); body.innerHTML = "";
-                snap.forEach(doc => {
-                    body.innerHTML += `<tr><td>${doc.data().name}</td>
-                    <td><button class="status-btn" style="background:#28a745;" onclick="toggleStatus(this)">حاضر</button></td></tr>`;
-                });
-                document.getElementById('saveBtn').style.display = "block";
-            });
-        };
-
-        window.saveAttendance = () => { 
-            alert("✅ تم إرسال الحضور بنجاح!");
-            document.getElementById('saveBtn').style.display = "none";
-        };
-    </script>
 </body>
 </html>

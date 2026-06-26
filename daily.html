@@ -10,7 +10,7 @@
         .table th, .table td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .table th { background-color: #f8f9fa; }
         
-        /* كلاس لإخفاء العناصر عند الطباعة */
+        /* هذا الجزء هو المسؤول عن إخفاء أي عنصر يحمل كلاس no-print عند الطباعة */
         @media print {
             .no-print { display: none !important; }
         }
@@ -25,11 +25,11 @@
 </div>
 
 <div id="reportArea" class="card" style="display:none;">
-    <div id="reportTitle" style="text-align:center; font-weight:bold; font-size:18px; margin-bottom:15px; color:#333;"></div>
+    <div id="reportTitle" style="text-align:center; font-weight:bold; margin-bottom:15px; font-size:1.2em;"></div>
     
     <div id="tableContainer"></div>
     
-    <button onclick="window.print()" class="no-print" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:20px;">طباعة التقرير (PDF)</button>
+    <button onclick="window.print()" class="no-print" style="background:#28a745; color:white; padding:10px; border:none; width:100%; margin-top:20px; cursor:pointer;">طباعة التقرير (PDF)</button>
 </div>
 
 <a href="index.html" style="display:block; text-align:center; margin-top:20px; color:#555;" class="no-print">← العودة للرئيسية</a>
@@ -50,14 +50,14 @@
         const dateVal = document.getElementById('reportDate').value;
         const container = document.getElementById('tableContainer');
         const titleDiv = document.getElementById('reportTitle');
-        
         document.getElementById('reportArea').style.display = "block";
         container.innerHTML = "جاري الجلب...";
 
         // حساب اليوم والتاريخ
         const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
         const d = new Date(dateVal);
-        titleDiv.innerHTML = `التقرير اليومي ليوم ${days[d.getDay()]} الموافق ${dateVal}`;
+        const dayName = days[d.getDay()];
+        titleDiv.innerHTML = `التقرير اليومي ليوم ${dayName} الموافق ${dateVal}`;
 
         const q = query(collection(db, "attendance"), where("date", "==", dateVal));
         const snap = await getDocs(q);

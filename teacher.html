@@ -64,9 +64,12 @@
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isLocked = doc.exists;
                 const savedData = isLocked ? doc.data().data : {};
-                if(isLocked) {
-                    document.getElementById('notes').value = doc.data().notes || "";
-                    document.getElementById('teacherName').value = doc.data().teacher || "";
+                            if(isLocked) {
+                document.getElementById('notes').value = doc.data().notes || "";
+                document.getElementById('teacherName').value = doc.data().teacher || "";
+                // أضف هذا السطر هنا:
+                document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
+            }
                 }
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";

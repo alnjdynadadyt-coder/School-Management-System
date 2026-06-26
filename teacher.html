@@ -11,6 +11,7 @@
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
         select, input, textarea { padding: 10px; border: 1px solid #ddd; border-radius: 8px; width: 100%; }
         .status-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; color: white; font-weight: bold; cursor: pointer; }
+        .status-btn:disabled { opacity: 0.7; cursor: not-allowed; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
@@ -20,23 +21,22 @@
 <body>
     <div class="container">
         <a href="index.html" id="backBtn">⬅️ العودة للرئيسية</a>
-        <h3>تسجيل الحضور (<span id="dayName"></span>)</h3>
+        <h3>تسجيل الحضور</h3>
         <div class="controls">
-            <input type="date" id="datePicker" onchange="updateDayName()">
+            <input type="date" id="datePicker">
             <input type="text" id="teacherName" placeholder="اسم المدرس">
             <select id="classSelect"><option>الرابع العلمي</option><option>الخامس العلمي</option><option>السادس العلمي</option><option>الرابع الادبي</option><option>الخامس الادبي</option><option>السادس الادبي</option></select>
             <select id="sectionSelect"><option>أ</option><option>ب</option><option>ج</option><option>د</option><option>هـ</option><option>و</option><option>ز</option></select>
             <select id="subjectSelect"><option>إسلامية</option><option>عربي</option><option>إنجليزي</option><option>رياضيات</option><option>فيزياء</option><option>كيمياء</option><option>أحياء</option><option>حاسوب</option><option>جغرافية</option><option>تاريخ</option><option>اجتماعيات</option><option>فلسفة</option><option>اقتصاد</option><option>جرائم</option><option>رياضة</option><option>فنية</option><option>أخرى</option></select>
             <select id="lessonSelect"><option>الدرس الأول</option><option>الدرس الثاني</option><option>الدرس الثالث</option><option>الدرس الرابع</option><option>الدرس الخامس</option><option>الدرس السادس</option></select>
-            <button onclick="loadStudentsForAttendance()" style="grid-column: span 2; background:#28a745; color:white; border:none; padding:10px; border-radius:8px;">جلب الأسماء</button>
+            <button onclick="loadStudents()" style="grid-column: span 2; background:#28a745; color:white; border:none; padding:10px; border-radius:8px;">جلب الأسماء</button>
         </div>
         <table>
             <thead><tr><th>اسم الطالب</th><th>الحالة</th></tr></thead>
             <tbody id="attendanceBody"></tbody>
         </table>
         <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%;"></textarea>
-        <button id="saveBtn" class="btn-save" onclick="saveAttendance()">إرسال/تحديث الحضور</button>
-        <button id="pdfBtn" class="btn-save" style="background:#dc3545;" onclick="exportPDF()">تصدير تقرير PDF</button>
+        <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
     </div>
 
     <script>
@@ -48,43 +48,33 @@
             const isAdmin = sessionStorage.getItem("isAdmin") === "true";
             if (isAdmin) {
                 document.getElementById('backBtn').style.display = "inline-block";
-            } else {
-                if(!sessionStorage.getItem("teacherLoggedIn")) {
-                    const pass = prompt("🔐 كلمة مرور المدرس:");
-                    if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
-                    sessionStorage.setItem("teacherLoggedIn", "true");
-                }
+            } else if(!sessionStorage.getItem("teacherLoggedIn")) {
+                const pass = prompt("🔐 كلمة مرور المدرس:");
+                if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
+                sessionStorage.setItem("teacherLoggedIn", "true");
             }
-            const now = new Date();
-            document.getElementById('datePicker').value = now.toISOString().split('T')[0];
-            updateDayName();
+            document.getElementById('datePicker').valueAsDate = new Date();
         };
 
-        function updateDayName() {
-            const date = new Date(document.getElementById('datePicker').value);
-            const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
-            document.getElementById('dayName').innerText = days[date.getDay()];
-        }
-
-        window.loadStudentsForAttendance = () => {
+        window.loadStudents = () => {
+            const isAdmin = sessionStorage.getItem("isAdmin") === "true";
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
+            
             db.collection("attendance").doc(docId).get().then(doc => {
-                const isLocked = doc.exists;
-                const savedData = isLocked ? doc.data().data : {};
-                if(isLocked) {
-                    document.getElementById('notes').value = doc.data().notes || "";
-                    document.getElementById('teacherName').value = doc.data().teacher || "";
-                    document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
-                }
+                const isSubmitted = doc.exists;
+                const savedData = isSubmitted ? doc.data().data : {};
+                
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
-                    snap.forEach((student) => {
-                        const sId = student.id;
-                        const status = isLocked ? (savedData[sId] || "حاضر") : "حاضر";
+                    snap.forEach(s => {
+                        const status = isSubmitted ? savedData[s.id] : "حاضر";
                         const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
-                        body.innerHTML += `<tr><td>${student.data().name}</td>
-                        <td><button class="status-btn" style="background:${color}" onclick="toggleStatus(this)" data-id="${sId}">${status}</button></td></tr>`;
+                        // المدرس لا يعدل إذا كان التقرير مرسلاً، المدير يعدل دائماً
+                        const isDisabled = isSubmitted && !isAdmin;
+                        body.innerHTML += `<tr><td>${s.data().name}</td>
+                        <td><button class="status-btn" style="background:${color}" ${isDisabled ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${s.id}">${status}</button></td></tr>`;
                     });
+                    document.getElementById('saveBtn').style.display = (isSubmitted && !isAdmin) ? "none" : "block";
                 });
             });
         };
@@ -102,12 +92,17 @@
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
-            db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ بنجاح!");
+            db.collection("attendance").doc(docId).set({ 
+                data, 
+                teacher: teacherName.value, 
+                subject: subjectSelect.value, 
+                notes: notes.value,
+                timestamp: new Date().toISOString()
+            }).then(() => {
+                alert("✅ تم إرسال التقرير!");
+                window.location.reload(); 
             });
         };
-
-        window.exportPDF = () => { window.print(); };
     </script>
 </body>
 </html>

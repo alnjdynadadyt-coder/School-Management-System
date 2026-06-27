@@ -15,6 +15,13 @@
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
         #backBtn { display: none; margin-bottom: 15px; padding: 10px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
+        
+        /* تنسيق الطباعة: إخفاء الأزرار غير المطلوبة عند الطباعة */
+        @media print {
+            #backBtn, .controls, .btn-save, #pdfBtn, #saveBtn { display: none !important; }
+            body { background: white; }
+            .container { box-shadow: none; width: 100%; }
+        }
     </style>
 </head>
 <body>
@@ -45,8 +52,11 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // دالة تحديث اسم اليوم عالمية وتعمل عند تغيير التاريخ أو تحميل الصفحة
         function updateDayName() {
-            const date = new Date(document.getElementById('datePicker').value);
+            const dateValue = document.getElementById('datePicker').value;
+            if(!dateValue) return;
+            const date = new Date(dateValue);
             const days = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
             document.getElementById('pageTitle').innerText = `تسجيل الحضور (${days[date.getDay()]})`;
         }
@@ -62,8 +72,9 @@
                 sessionStorage.setItem("teacherLoggedIn", "true");
             }
             
+            // ضبط التاريخ الافتراضي
             document.getElementById('datePicker').valueAsDate = new Date();
-            updateDayName();
+            updateDayName(); // تحديث اليوم فوراً
         };
 
         window.loadStudents = () => {

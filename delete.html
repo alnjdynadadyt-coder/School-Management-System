@@ -2,25 +2,28 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>حذف السجلات</title>
+    <title>حذف سجلات الحضور</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f4f9; }
         .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        select, input { padding: 10px; margin: 10px 0; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+        select, input { padding: 10px; margin: 10px 0; width: 100%; border-radius: 8px; border: 1px solid #ccc; box-sizing: border-box; }
         button { padding: 12px; width: 100%; border: none; border-radius: 8px; background: #dc3545; color: white; cursor: pointer; font-weight: bold; margin-top: 10px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <a href="index.html" style="display: block; margin-bottom: 20px; color: #6c757d; text-decoration: none;">⬅️ العودة للرئيسية</a>
         <h3>🗑️ حذف سجلات الحضور</h3>
+        
         <select id="classSelect"><option value="">اختر الصف</option></select>
         <select id="sectionSelect"><option value="">اختر الشعبة</option></select>
         <select id="studentSelect"><option value="all">الكل</option></select>
-        <input type="date" id="dateFrom" placeholder="من تاريخ">
-        <input type="date" id="dateTo" placeholder="إلى تاريخ">
+        <input type="date" id="dateFrom">
+        <input type="date" id="dateTo">
         <input type="password" id="adminPass" placeholder="أدخل كلمة مرور الإدارة">
+        
         <button onclick="performDelete()">حذف السجلات المحددة</button>
     </div>
 
@@ -29,73 +32,86 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // تحميل الصفوف عند فتح الصفحة
+        // 1. تحميل القوائم تلقائياً
         document.addEventListener('DOMContentLoaded', () => {
-            const classSelect = document.getElementById('classSelect');
             db.collection("students").get().then(snap => {
                 let classes = new Set();
                 snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
+                const classSelect = document.getElementById('classSelect');
                 classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
             });
         });
 
-        // تحميل الشعب عند اختيار الصف
+        // 2. تحميل الشعب
         document.getElementById('classSelect').addEventListener('change', function() {
-            const c = this.value;
             const secSelect = document.getElementById('sectionSelect');
             secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
-            if(!c) return;
-            db.collection("students").where("class", "==", c).get().then(snap => {
+            db.collection("students").where("class", "==", this.value).get().then(snap => {
                 let sections = new Set();
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
                 sections.forEach(s => secSelect.innerHTML += `<option value="${s}">${s}</option>`);
             });
         });
 
-        // تحميل الطلاب عند اختيار الشعبة
+        // 3. تحميل الطلاب
         document.getElementById('sectionSelect').addEventListener('change', function() {
             const c = document.getElementById('classSelect').value;
-            const s = this.value;
             const stuSelect = document.getElementById('studentSelect');
             stuSelect.innerHTML = '<option value="all">الكل</option>';
-            if(!s) return;
-            db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
+            db.collection("students").where("class", "==", c).where("section", "==", this.value).get().then(snap => {
                 snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
         });
 
+        // 4. عملية الحذف الذكية
         async function performDelete() {
-            const pass = document.getElementById('adminPass').value;
-            if (pass !== "12345") { alert("كلمة المرور غير صحيحة!"); return; } // يمكنك تغيير كلمة المرور هنا
-
+            if (document.getElementById('adminPass').value !== "12345") { alert("كلمة المرور غير صحيحة!"); return; }
+            
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
+            const c = document.getElementById('classSelect').value;
+            const s = document.getElementById('sectionSelect').value;
             const stuId = document.getElementById('studentSelect').value;
             
-            if(!dFrom || !dTo) { alert("يرجى اختيار التاريخ من وإلى"); return; }
-            if (!confirm("⚠️ تحذير: سيتم حذف البيانات نهائياً. هل أنت متأكد؟")) return;
+            if(!c || !s || !dFrom || !dTo) { alert("يرجى ملء جميع الحقول!"); return; }
 
-            const snapshot = await db.collection("attendance").get();
+            // جلب الطلاب في الصف المختار فقط
+            const studentsSnap = await db.collection("students").where("class", "==", c).where("section", "==", s).get();
+            const targetIds = studentsSnap.docs.map(doc => doc.id);
+            
+            const attendanceSnap = await db.collection("attendance").get();
             const batch = db.batch();
-            let deletedCount = 0;
+            let count = 0;
 
-            snapshot.forEach(doc => {
-                const docDate = doc.id.split('_')[0];
-                if (docDate >= dFrom && docDate <= dTo) {
+            attendanceSnap.forEach(doc => {
+                const date = doc.id.split('_')[0];
+                if (date >= dFrom && date <= dTo) {
                     let data = doc.data().data || {};
+                    let updated = false;
+
                     if (stuId === "all") {
-                        batch.delete(doc.ref);
-                        deletedCount++;
+                        // حذف طلاب الصف والشعبة المختارين فقط
+                        targetIds.forEach(id => {
+                            if (data[id]) { delete data[id]; updated = true; }
+                        });
                     } else if (data[stuId]) {
+                        // حذف طالب واحد محدد
                         delete data[stuId];
+                        updated = true;
+                    }
+
+                    if (updated) {
                         batch.update(doc.ref, { data: data });
-                        deletedCount++;
+                        count++;
                     }
                 }
             });
 
+            if (count === 0) { alert("لا توجد سجلات مطابقة للحذف."); return; }
+            if (!confirm("⚠️ هل أنت متأكد؟ سيتم حذف " + count + " سجل.")) return;
+
             await batch.commit();
-            alert("تمت العملية بنجاح! تم حذف/تحديث " + deletedCount + " سجل.");
+            alert("تم الحذف بنجاح!");
             location.reload();
         }
     </script>

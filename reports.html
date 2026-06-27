@@ -5,18 +5,22 @@
     <title>التقرير الشامل</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
         select, input, button { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
+        .btn-only { padding: 10px; border-radius: 8px; border: none; cursor: pointer; color: white; background: #6f42c1; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
+        @media print { .btn-only { display: none !important; } }
     </style>
 </head>
 <body>
     <div class="container">
+        <a href="index.html" class="btn-only" style="display:inline-block; text-decoration:none; margin-bottom:10px; background:#6c757d;">⬅️ العودة للرئيسية</a>
         <h3>التقرير الشامل للطلاب</h3>
         <div class="controls">
             <select id="classSelect" onchange="loadSections()"><option value="">الصف</option></select>
@@ -24,119 +28,100 @@
             <select id="studentSelect"><option value="all">الكل</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
-            <button onclick="generateComprehensiveReport()" style="background: #6f42c1; color: white; border: none; cursor: pointer; grid-column: span 3;">عرض التقرير</button>
+            <button class="btn-only" onclick="generateComprehensiveReport()">عرض التقرير</button>
+            <button class="btn-only" onclick="exportPDF()" style="background:#28a745;">تصدير PDF 📄</button>
         </div>
         <table>
-            <thead>
-                <tr>
-                    <th>اسم الطالب</th>
-                    <th>أيام غياب</th>
-                    <th>دروس غياب</th>
-                    <th>أيام إجازة</th>
-                    <th>دروس إجازة</th>
-                </tr>
-            </thead>
+            <thead><tr><th>اسم الطالب</th><th>أيام غياب</th><th>دروس غياب</th><th>أيام إجازة</th><th>دروس إجازة</th></tr></thead>
             <tbody id="reportTableBody"></tbody>
         </table>
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 1. جلب الصفوف
+        // [تحميل البيانات]
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
-            const classSelect = document.getElementById('classSelect');
-            classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            const s = document.getElementById('classSelect');
+            classes.forEach(c => s.innerHTML += `<option value="${c}">${c}</option>`);
         });
 
-        // 2. تحميل الشعب
         function loadSections() {
             const c = document.getElementById('classSelect').value;
-            const secSelect = document.getElementById('sectionSelect');
-            secSelect.innerHTML = '<option value="">الشعبة</option>';
-            if (!c) return;
+            const sec = document.getElementById('sectionSelect');
+            sec.innerHTML = '<option value="">الشعبة</option>';
             db.collection("students").where("class", "==", c).get().then(snap => {
                 let sections = new Set();
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
-                sections.forEach(s => secSelect.innerHTML += `<option value="${s}">${s}</option>`);
+                sections.forEach(s => sec.innerHTML += `<option value="${s}">${s}</option>`);
             });
         }
 
-        // 3. تحميل الطلاب
         function loadStudents() {
             const c = document.getElementById('classSelect').value;
-            const s = document.getElementById('sectionSelect').value;
-            const stuSelect = document.getElementById('studentSelect');
-            stuSelect.innerHTML = '<option value="all">الكل</option>';
-            if (!c || !s) return;
-            db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
-                snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
+            const sec = document.getElementById('sectionSelect').value;
+            const stu = document.getElementById('studentSelect');
+            stu.innerHTML = '<option value="all">الكل</option>';
+            db.collection("students").where("class", "==", c).where("section", "==", sec).get().then(snap => {
+                snap.forEach(doc => stu.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
         }
 
-        // 4. التقرير الشامل بمعادلة الـ 4 دروس
         async function generateComprehensiveReport() {
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
             const stuId = document.getElementById('studentSelect').value;
-            
-            if(!dFrom || !dTo) { alert("يرجى تحديد التاريخ"); return; }
+            const c = document.getElementById('classSelect').value;
+            const sec = document.getElementById('sectionSelect').value;
+
+            if(!dFrom || !dTo) { alert("حدد التاريخ"); return; }
 
             const attendSnap = await db.collection("attendance").get();
-            const studentsSnap = await db.collection("students").get();
-            let studentsData = {};
-
-            // تهيئة بيانات الطلاب
+            const studentsSnap = await db.collection("students").where("class", "==", c).where("section", "==", sec).get();
+            
+            let reportData = {};
             studentsSnap.forEach(doc => {
                 if(stuId === "all" || doc.id === stuId) {
-                    studentsData[doc.id] = { name: doc.data().name, absent: {}, leave: {} };
+                    reportData[doc.id] = { name: doc.data().name, abs: {}, lea: {} };
                 }
             });
 
-            // معالجة البيانات
             attendSnap.forEach(doc => {
                 const parts = doc.id.split('_');
                 const d = parts[0];
                 if(d >= dFrom && d <= dTo) {
                     const data = doc.data().data || {};
                     Object.keys(data).forEach(sId => {
-                        if(studentsData[sId]) {
-                            let status = data[sId];
-                            if(status === "غائب" || status === "مجاز") {
-                                let type = status === "غائب" ? "absent" : "leave";
-                                if(!studentsData[sId][type][d]) studentsData[sId][type][d] = 0;
-                                studentsData[sId][type][d]++;
-                            }
+                        if(reportData[sId]) {
+                            if(data[sId] === "غائب") { reportData[sId].abs[d] = (reportData[sId].abs[d] || 0) + 1; }
+                            if(data[sId] === "مجاز") { reportData[sId].lea[d] = (reportData[sId].lea[d] || 0) + 1; }
                         }
                     });
                 }
             });
 
-            // حساب النتائج وعرضها
             let html = "";
-            for(let sId in studentsData) {
-                let absDays = 0, absLessons = 0, leaveDays = 0, leaveLessons = 0;
-                
-                ["absent", "leave"].forEach(type => {
-                    for(let d in studentsData[sId][type]) {
-                        let count = studentsData[sId][type][d];
-                        if(type === "absent") {
-                            absDays += Math.floor(count / 4);
-                            absLessons += (count % 4);
-                        } else {
-                            leaveDays += Math.floor(count / 4);
-                            leaveLessons += (count % 4);
-                        }
-                    }
-                });
-                
-                html += `<tr><td>${studentsData[sId].name}</td><td>${absDays}</td><td>${absLessons}</td><td>${leaveDays}</td><td>${leaveLessons}</td></tr>`;
+            for(let sId in reportData) {
+                let aD = 0, aL = 0, lD = 0, lL = 0;
+                for(let d in reportData[sId].abs) { aD += Math.floor(reportData[sId].abs[d]/4); aL += (reportData[sId].abs[d]%4); }
+                for(let d in reportData[sId].lea) { lD += Math.floor(reportData[sId].lea[d]/4); lL += (reportData[sId].lea[d]%4); }
+
+                // شرط إظهار الطالب فقط إذا كان لديه حالات أو إذا كان مختاراً تحديداً
+                if(stuId !== "all" || (aD > 0 || aL > 0 || lD > 0 || lL > 0)) {
+                    html += `<tr><td>${reportData[sId].name}</td><td>${aD}</td><td>${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
+                }
             }
-            document.getElementById('reportTableBody').innerHTML = html || "<tr><td colspan='5'>لا توجد بيانات للفترة المحددة</td></tr>";
+            document.getElementById('reportTableBody').innerHTML = html || "<tr><td colspan='5'>لا توجد حالات مسجلة</td></tr>";
+        }
+
+        function exportPDF() {
+            const el = document.querySelector('.container');
+            document.querySelectorAll('.btn-only').forEach(b => b.style.display = 'none');
+            html2pdf().from(el).set({margin:5, filename:'التقرير_الشامل.pdf', html2canvas:{scale:2}}).save().then(() => {
+                document.querySelectorAll('.btn-only').forEach(b => b.style.display = '');
+            });
         }
     </script>
 </body>

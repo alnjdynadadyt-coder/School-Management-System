@@ -6,56 +6,54 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
-<body style="font-family: sans-serif; padding: 20px; background: #f4f7f6;">
-
-    <div style="max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px;">
-        <a href="index.html">⬅️ عودة</a>
-        <h3 id="title">تقرير الغيابات</h3>
+<body>
+    <div style="padding: 20px;">
+        <h3>تقرير الغيابات</h3>
         <input type="date" id="dateFilter" onchange="loadReport()">
-        <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center;">
+        <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
             <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
             <tbody id="body"></tbody>
         </table>
     </div>
 
     <script>
-        // إعداد Firebase - تأكد أن هذا الجزء مطابق لما في teacher.html
+        // إعداد Firebase - مطابق تماماً لما يعمل لديك
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
         
-        // التحقق من أن التطبيق لم يُنشأ مسبقاً
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-        const db = firebase.firestore();
+        // التحقق من البدء
+        try {
+            if (!firebase.apps.length) {
+                firebase.initializeApp(firebaseConfig);
+            }
+            const db = firebase.firestore();
 
-        document.getElementById('dateFilter').valueAsDate = new Date();
+            document.getElementById('dateFilter').valueAsDate = new Date();
 
-        function loadReport() {
-            const date = document.getElementById('dateFilter').value;
-            const body = document.getElementById('body');
-            body.innerHTML = "جاري التحميل...";
+            function loadReport() {
+                const date = document.getElementById('dateFilter').value;
+                const body = document.getElementById('body');
+                body.innerHTML = "جاري التحميل...";
 
-            db.collection("attendance").get().then((snap) => {
-                body.innerHTML = "";
-                snap.forEach((doc) => {
-                    if(doc.id.startsWith(date)) {
-                        const data = doc.data().data;
-                        const parts = doc.id.split('_');
-                        
-                        for(let sId in data) {
-                            if(data[sId] !== "حاضر") {
-                                body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
+                db.collection("attendance").get().then((snap) => {
+                    body.innerHTML = "";
+                    snap.forEach((doc) => {
+                        if(doc.id.startsWith(date)) {
+                            const data = doc.data().data;
+                            const parts = doc.id.split('_');
+                            for(let sId in data) {
+                                if(data[sId] !== "حاضر") {
+                                    body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
+                                }
                             }
                         }
-                    }
+                    });
                 });
-            }).catch(err => {
-                body.innerHTML = "<tr><td colspan='3'>خطأ: " + err.message + "</td></tr>";
-            });
+            }
+            // تشغيل
+            loadReport();
+        } catch(e) {
+            document.body.innerHTML = "<h1>خطأ في الاتصال: " + e.message + "</h1>";
         }
-        
-        // تشغيل الدالة بعد التأكد من تحميل الصفحة
-        window.onload = loadReport;
     </script>
 </body>
 </html>

@@ -118,15 +118,24 @@
             document.getElementById('summary').innerHTML = `<span class="summary-total">إجمالي الغياب: ${(absCount/4).toFixed(1)} يوم</span> | الإجازات: ${(leaveCount/4).toFixed(1)} يوم`;
         }
 
-        function exportPDF() {
+                function exportPDF() {
+            // تحديد العناصر المراد إخفاؤها
+            const elementsToHide = document.querySelectorAll('.no-print');
+            
+            // إخفاء الأزرار مؤقتاً
+            elementsToHide.forEach(el => el.style.display = 'none');
+
             const element = document.querySelector('.container');
-            // التأكد من أن الأزرار لن تظهر في ملف الـ PDF
+            
             html2pdf().from(element).set({
                 margin: 5,
                 filename: 'تقرير_الطالب.pdf',
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).save();
+            }).save().then(() => {
+                // إعادة الأزرار للظهور بعد انتهاء الحفظ
+                elementsToHide.forEach(el => el.style.display = '');
+            });
         }
     </script>
 </body>

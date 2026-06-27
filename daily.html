@@ -19,8 +19,13 @@
     </div>
 
     <script>
+        // إعداد Firebase - تأكد أن هذا الجزء مطابق لما في teacher.html
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        
+        // التحقق من أن التطبيق لم يُنشأ مسبقاً
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
         const db = firebase.firestore();
 
         document.getElementById('dateFilter').valueAsDate = new Date();
@@ -45,10 +50,12 @@
                     }
                 });
             }).catch(err => {
-                body.innerHTML = "<tr><td colspan='3'>حدث خطأ: " + err.message + "</td></tr>";
+                body.innerHTML = "<tr><td colspan='3'>خطأ: " + err.message + "</td></tr>";
             });
         }
-        loadReport();
+        
+        // تشغيل الدالة بعد التأكد من تحميل الصفحة
+        window.onload = loadReport;
     </script>
 </body>
 </html>

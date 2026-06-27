@@ -15,10 +15,12 @@
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
         #backBtn { display: none; margin-bottom: 15px; padding: 10px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
-        
-        /* تنسيق الطباعة: إخفاء الأزرار غير المطلوبة عند الطباعة */
+        .print-only { display: none; margin-bottom: 15px; font-weight: bold; font-size: 18px; }
+
         @media print {
-            #backBtn, .controls, .btn-save, #pdfBtn, #saveBtn { display: none !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            #backBtn, .controls, .btn-save, #pdfBtn, #saveBtn, textarea { display: none !important; }
+            .print-only { display: block !important; }
             body { background: white; }
             .container { box-shadow: none; width: 100%; }
         }
@@ -27,7 +29,7 @@
 <body>
     <div class="container">
         <a href="index.html" id="backBtn">⬅️ العودة للرئيسية</a>
-        
+        <div class="print-only" id="printHeader"></div>
         <h3 id="pageTitle">تسجيل الحضور</h3>
         <div class="controls">
             <input type="date" id="datePicker" onchange="updateDayName()">
@@ -44,7 +46,7 @@
         </table>
         <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%;"></textarea>
         <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
-        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="window.print()">تصدير تقرير PDF</button>
+        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="preparePrint()">تصدير تقرير PDF</button>
     </div>
 
     <script>
@@ -52,7 +54,6 @@
         if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // دالة تحديث اسم اليوم عالمية وتعمل عند تغيير التاريخ أو تحميل الصفحة
         function updateDayName() {
             const dateValue = document.getElementById('datePicker').value;
             if(!dateValue) return;
@@ -61,44 +62,43 @@
             document.getElementById('pageTitle').innerText = `تسجيل الحضور (${days[date.getDay()]})`;
         }
 
+        function preparePrint() {
+            const date = document.getElementById('datePicker').value;
+            const sub = document.getElementById('subjectSelect').value;
+            const tea = document.getElementById('teacherName').value;
+            document.getElementById('printHeader').innerHTML = `${document.getElementById('pageTitle').innerText} - التاريخ: ${date}<br>المادة: ${sub} | المدرس: ${tea}`;
+            window.print();
+        }
+
         window.onload = () => {
             const isAdmin = sessionStorage.getItem("isAdmin") === "true";
-            
-            if (isAdmin) {
-                document.getElementById('backBtn').style.display = "inline-block";
-            } else if(!sessionStorage.getItem("teacherLoggedIn")) {
+            if (isAdmin) document.getElementById('backBtn').style.display = "inline-block";
+            else if(!sessionStorage.getItem("teacherLoggedIn")) {
                 const pass = prompt("🔐 كلمة مرور المدرس:");
                 if (pass !== "Teacher123") { document.body.innerHTML = "<h1>❌ دخول مرفوض</h1>"; return; }
                 sessionStorage.setItem("teacherLoggedIn", "true");
             }
-            
-            // ضبط التاريخ الافتراضي
             document.getElementById('datePicker').valueAsDate = new Date();
-            updateDayName(); // تحديث اليوم فوراً
+            updateDayName();
         };
 
         window.loadStudents = () => {
             const isAdmin = sessionStorage.getItem("isAdmin") === "true";
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
-            
             db.collection("attendance").doc(docId).get().then(doc => {
                 const isSubmitted = doc.exists;
                 const savedData = isSubmitted ? doc.data().data : {};
-                
                 if(isSubmitted) {
                     document.getElementById('notes').value = doc.data().notes || "";
                     document.getElementById('teacherName').value = doc.data().teacher || "";
                     document.getElementById('subjectSelect').value = doc.data().subject || "إسلامية";
                 }
-
                 db.collection("students").where("class", "==", classSelect.value).where("section", "==", sectionSelect.value).get().then(snap => {
                     const body = document.getElementById('attendanceBody'); body.innerHTML = "";
                     snap.forEach(s => {
                         const status = isSubmitted ? (savedData[s.id] || "حاضر") : "حاضر";
                         const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
-                        const isDisabled = isSubmitted && !isAdmin;
-                        body.innerHTML += `<tr><td>${s.data().name}</td>
-                        <td><button class="status-btn" style="background:${color}" ${isDisabled ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${s.id}">${status}</button></td></tr>`;
+                        body.innerHTML += `<tr><td>${s.data().name}</td><td><button class="status-btn" style="background:${color}" ${(isSubmitted && !isAdmin) ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${s.id}">${status}</button></td></tr>`;
                     });
                     document.getElementById('saveBtn').style.display = (isSubmitted && !isAdmin) ? "none" : "block";
                     document.getElementById('pdfBtn').style.display = isSubmitted ? "block" : "none";
@@ -119,9 +119,7 @@
             const docId = `${datePicker.value}_${classSelect.value}_${sectionSelect.value}_${lessonSelect.value}`;
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
-            db.collection("attendance").doc(docId).set({ 
-                data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value 
-            }).then(() => {
+            db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
                 alert("✅ تم الحفظ بنجاح!");
                 location.reload();
             });

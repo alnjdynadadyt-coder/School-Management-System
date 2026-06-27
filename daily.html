@@ -1,69 +1,52 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقرير اليومي</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 850px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        h3 { text-align: center; color: #333; }
-        .controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
-        #backBtn { padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { background: #4a90e2; color: white; padding: 12px; }
-        td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        .absent { color: #d9534f; font-weight: bold; background: #fff5f5; }
-        .leave { color: #f0ad4e; font-weight: bold; background: #fffcf0; }
-        .btn-print { background: #28a745; color: white; padding: 12px 30px; border: none; border-radius: 8px; width: 100%; font-size: 18px; cursor: pointer; margin-top: 20px; }
-        
-        @media print {
-            .btn-print, .controls, #backBtn { display: none !important; }
-            .container { box-shadow: none; width: 100%; }
+<script>
+    const db = firebase.firestore();
+
+    // 1. تهيئة التاريخ فور تحميل الصفحة
+    window.onload = function() {
+        const dateInput = document.getElementById('dateFilter');
+        if (!dateInput.value) {
+            dateInput.valueAsDate = new Date();
+            loadReport(); // استدعاء الدالة لجلب البيانات مباشرة
         }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <a href="index.html" id="backBtn">⬅️ العودة</a>
-        <h3 id="reportTitle">تقرير الغيابات اليومي</h3>
-        <div class="controls">
-            <input type="date" id="dateFilter" onchange="loadReport()">
-        </div>
-        <table>
-            <thead><tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>التفاصيل</th></tr></thead>
-            <tbody id="reportBody"></tbody>
-        </table>
-        <button class="btn-print" onclick="window.print()">🖨️ طباعة التقرير</button>
-    </div>
+    };
 
-    <script>
-        const db = firebase.firestore();
-        document.getElementById('dateFilter').valueAsDate = new Date();
+    async function loadReport() {
+        const date = document.getElementById('dateFilter').value;
+        const body = document.getElementById('reportBody');
+        const reportTitle = document.getElementById('reportTitle');
+        
+        // التحقق من وجود التاريخ
+        if(!date) return;
 
-        async function loadReport() {
-            const date = document.getElementById('dateFilter').value;
-            const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
-            document.getElementById('reportTitle').innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
-            
-            const body = document.getElementById('reportBody');
-            body.innerHTML = "<tr><td colspan='3'>جاري التحميل...</td></tr>";
+        body.innerHTML = "<tr><td colspan='3'>جاري جلب البيانات...</td></tr>";
+        
+        // تحويل التاريخ لاسم يوم
+        const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
+        if(reportTitle) reportTitle.innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
 
+        try {
+            // جلب البيانات من Firestore
             const snapshot = await db.collection("attendance").get();
             const studentsSnap = await db.collection("students").get();
             const students = {};
             studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
 
             let reportData = {};
+
             snapshot.forEach(doc => {
-                if(doc.id.startsWith(date)) {
+                // التأكد من أن معرف الوثيقة يحتوي على التاريخ المختار
+                if(doc.id.includes(date)) {
                     const data = doc.data().data;
                     const parts = doc.id.split('_'); 
                     for(let sId in data) {
                         if(data[sId] !== "حاضر") {
-                            if(!reportData[sId]) reportData[sId] = { name: students[sId] || sId, class: `${parts[1]} - ${parts[2]}`, absences: [] };
-                            // اختصار اسم الدرس: "الدرس الأول" -> "الأول"
+                            if(!reportData[sId]) {
+                                reportData[sId] = { 
+                                    name: students[sId] || sId, 
+                                    class: `${parts[1]} - ${parts[2]}`, 
+                                    absences: [] 
+                                };
+                            }
                             let lessonShort = parts[3].replace("الدرس ", "");
                             reportData[sId].absences.push(`${lessonShort} <span class="${data[sId] === 'غائب' ? 'absent' : 'leave'}">${data[sId]}</span>`);
                         }
@@ -71,14 +54,21 @@
                 }
             });
 
+            // عرض البيانات
             body.innerHTML = "";
-            Object.keys(reportData).sort().forEach(id => {
-                let s = reportData[id];
-                body.innerHTML += `<tr><td>${s.name}</td><td>${s.class}</td><td>${s.absences.join(' | ')}</td></tr>`;
-            });
-            if(Object.keys(reportData).length === 0) body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات لهذا اليوم</td></tr>";
+            const sortedKeys = Object.keys(reportData).sort();
+            
+            if(sortedKeys.length === 0) {
+                body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات لهذا التاريخ</td></tr>";
+            } else {
+                sortedKeys.forEach(id => {
+                    let s = reportData[id];
+                    body.innerHTML += `<tr><td>${s.name}</td><td>${s.class}</td><td>${s.absences.join(' | ')}</td></tr>`;
+                });
+            }
+        } catch(e) {
+            console.error(e);
+            body.innerHTML = "<tr><td colspan='3'>حدث خطأ أثناء تحميل البيانات</td></tr>";
         }
-        loadReport();
-    </script>
-</body>
-</html>
+    }
+</script>

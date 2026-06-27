@@ -12,10 +12,20 @@
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
-        @media print { .no-print { display: none !important; } }
+        
+        /* إخفاء الأزرار عند الطباعة/التصدير */
+        @media print {
+            .no-print { display: none !important; }
+        }
+
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
+
+        /* ألوان الحالات */
+        .status-absent { color: red; font-weight: bold; }
+        .status-leave { color: orange; font-weight: bold; }
+        .total-red { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -31,24 +41,21 @@
             <button onclick="generateReport()" style="background: #6f42c1; color: white; border: none; cursor: pointer;">عرض التقرير</button>
             <button onclick="exportPDF()" style="background: #28a745; color: white; border: none; cursor: pointer;">تصدير PDF 📄</button>
         </div>
-        <div id="summary" style="margin-bottom: 15px; font-weight: bold; color: #6f42c1;"></div>
+        <div id="summary" style="margin-bottom: 15px; font-weight: bold;"></div>
         <table>
-            <thead><tr><th>التاريخ</th><th>الدرس</th><th>الحالة</th></tr></thead>
+            <thead><tr><th>التاريخ</th><th>الدروس المسجلة</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // تحميل الصفوف تلقائياً عند فتح الصفحة
+        // [كود تحميل الصفوف والشعب والطلاب - حافظت عليه كما هو ليعمل...]
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
-            const classSelect = document.getElementById('classSelect');
-            classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            classes.forEach(c => document.getElementById('classSelect').innerHTML += `<option value="${c}">${c}</option>`);
         });
 
         function loadSections() {
@@ -76,30 +83,33 @@
             const sId = document.getElementById('studentSelect').value;
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
-            const body = document.getElementById('reportBody');
-            const summary = document.getElementById('summary');
-            
-            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار الطالب والفترة الزمنية"); return; }
-            body.innerHTML = "جاري جلب البيانات...";
+            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار البيانات"); return; }
             
             const attendSnap = await db.collection("attendance").get();
-            let abs = 0, leave = 0, rows = [];
+            let abs = 0, leave = 0, grouped = {};
             
             attendSnap.forEach(doc => {
                 const parts = doc.id.split('_');
-                const docDate = parts[0]; 
+                const docDate = parts[0];
                 if(docDate >= dFrom && docDate <= dTo) {
                     const data = doc.data().data || {};
                     if(data[sId] && data[sId] !== "حاضر") {
+                        if(!grouped[docDate]) grouped[docDate] = {lessons: [], status: data[sId]};
+                        grouped[docDate].lessons.push(parts[3] || 'درس');
                         if(data[sId] === "غائب") abs++; 
                         if(data[sId] === "مجاز") leave++;
-                        rows.push({date: docDate, lesson: parts[3] || 'غير محدد', status: data[sId]});
                     }
                 }
             });
-            rows.sort((a, b) => a.date.localeCompare(b.date));
-            body.innerHTML = rows.map(r => `<tr><td>${r.date}</td><td>${r.lesson}</td><td>${r.status}</td></tr>`).join('') || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
-            summary.innerHTML = `إجمالي الغياب: ${(abs/4).toFixed(1)} يوم | الإجازات: ${(leave/4).toFixed(1)} يوم`;
+
+            let html = "";
+            Object.keys(grouped).sort().forEach(date => {
+                const statusClass = grouped[date].status === "غائب" ? "status-absent" : "status-leave";
+                html += `<tr><td>${date}</td><td>${grouped[date].lessons.join('، ')}</td><td class="${statusClass}">${grouped[date].status}</td></tr>`;
+            });
+            
+            document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
+            document.getElementById('summary').innerHTML = `<span class="total-red">إجمالي الغياب: ${(abs/4).toFixed(1)} يوم</span> | الإجازات: ${(leave/4).toFixed(1)} يوم`;
         }
 
         function exportPDF() {

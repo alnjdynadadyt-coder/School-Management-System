@@ -2,84 +2,75 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>حذف السجلات المخصص</title>
+    <title>حذف السجلات</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f9; }
-        .card { background: white; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; }
-        select, input, button { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
-        button { cursor: pointer; border: none; color: white; font-weight: bold; }
-        .btn-delete { background: #d9534f; }
-        .btn-back { background: #6c757d; }
+        /* نفس تنسيقاتك الجميلة */
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f4f4f9; }
+        .container { max-width: 600px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        select, input { padding: 10px; margin: 5px 0; width: 100%; border-radius: 8px; border: 1px solid #ccc; }
+        button { padding: 12px; width: 100%; border: none; border-radius: 8px; background: #dc3545; color: white; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
+    <div class="container">
+        <h3>🗑️ حذف سجلات الحضور</h3>
+        <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
+        <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
+        <select id="studentSelect"><option value="all">الكل</option></select>
+        <input type="date" id="dateFrom">
+        <input type="date" id="dateTo">
+        <input type="password" id="adminPass" placeholder="أدخل كلمة مرور الإدارة">
+        <button onclick="performDelete()">حذف السجلات المحددة</button>
+    </div>
 
-<div class="card">
-    <h3>🗑️ حذف سجلات الحضور</h3>
-    <label>التاريخ:</label>
-    <input type="date" id="dateFilter">
-    <label>الصف:</label>
-    <select id="classFilter">
-        <option value="all">الكل</option>
-        <option value="الرابع العلمي">الرابع العلمي</option>
-        <option value="الخامس العلمي">الخامس العلمي</option>
-    </select>
-    <label>اسم الطالب (اختياري - لحذف فردي):</label>
-    <input type="text" id="nameFilter" placeholder="اتركه فارغاً لحذف الصف كاملاً">
-    
-    <button id="btnDelete" class="btn-delete" onclick="deleteTargetedData()">تنفيذ الحذف</button>
-    <button class="btn-back" onclick="window.location.href='index.html'">عودة للرئيسية</button>
-</div>
+    <script>
+        const db = firebase.firestore();
+        const CORRECT_PASS = "12345"; // غيرها لكلمة مرورك الخاصة
 
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
-    import { getFirestore, collection, getDocs, writeBatch, query, where } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-    
-    const db = getFirestore(initializeApp({ apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865", appId: "1:752295259069:web:cb0824a579e714bb77c0d4" }));
+        async function performDelete() {
+            const pass = document.getElementById('adminPass').value;
+            if (pass !== CORRECT_PASS) { alert("كلمة المرور غير صحيحة!"); return; }
 
-    window.deleteTargetedData = async () => {
-        if(prompt("كلمة السر:") !== "1234") return alert("كلمة سر خاطئة!");
-        
-        const dateVal = document.getElementById('dateFilter').value;
-        const classVal = document.getElementById('classFilter').value;
-        const nameVal = document.getElementById('nameFilter').value.trim();
-
-        if(!dateVal) return alert("يرجى تحديد التاريخ");
-
-        const btn = document.getElementById('btnDelete');
-        btn.disabled = true;
-        btn.innerText = "جاري البحث...";
-
-        // جلب البيانات بناءً على التاريخ
-        const q = query(collection(db, "attendance"), where("date", "==", dateVal));
-        const snap = await getDocs(q);
-        
-        let batch = writeBatch(db), count = 0;
-        
-        snap.forEach(doc => {
-            const d = doc.data();
-            const matchClass = (classVal === "all" || d.class === classVal);
-            const matchName = (nameVal === "" || d.name === nameVal);
+            const dFrom = document.getElementById('dateFrom').value;
+            const dTo = document.getElementById('dateTo').value;
+            const stuId = document.getElementById('studentSelect').value;
             
-            if(matchClass && matchName) {
-                batch.delete(doc.ref);
-                count++;
-            }
-        });
+            if(!dFrom || !dTo) { alert("حدد الفترة الزمنية"); return; }
 
-        if(count > 0) {
-            if(confirm(`سيتم حذف ${count} سجل. هل أنت متأكد؟`)) {
-                await batch.commit();
-                alert(`تم حذف ${count} سجل بنجاح.`);
-                location.reload();
-            } else {
-                btn.disabled = false; btn.innerText = "تنفيذ الحذف";
-            }
-        } else {
-            alert("لا توجد سجلات تطابق خياراتك.");
-            btn.disabled = false; btn.innerText = "تنفيذ الحذف";
+            if (!confirm("⚠️ تحذير: سيتم حذف البيانات نهائياً. هل أنت متأكد؟")) return;
+
+            // جلب سجلات الحضور في الفترة المحددة
+            const snapshot = await db.collection("attendance").get();
+            
+            const batch = db.batch();
+            let count = 0;
+
+            snapshot.forEach(doc => {
+                const docDate = doc.id.split('_')[0];
+                if (docDate >= dFrom && docDate <= dTo) {
+                    let data = doc.data().data || {};
+                    
+                    if (stuId === "all") {
+                        // حذف سجلات الصف/الشعبة كاملاً (إذا أردت حذف المستند ليوم كامل)
+                        batch.delete(doc.ref);
+                        count++;
+                    } else if (data[stuId]) {
+                        // حذف طالب معين فقط من سجل اليوم
+                        delete data[stuId];
+                        batch.update(doc.ref, { data: data });
+                        count++;
+                    }
+                }
+            });
+
+            await batch.commit();
+            alert("تمت العملية بنجاح! تم معالجة " + count + " سجل.");
+            location.reload();
         }
-    };
-</script>
+        
+        // أضف دوال loadSections و loadStudents هنا بنفس منطق صفحة التقارير
+    </script>
 </body>
 </html>

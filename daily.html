@@ -1,74 +1,54 @@
-<script>
-    const db = firebase.firestore();
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>التقرير اليومي</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+</head>
+<body style="font-family: sans-serif; padding: 20px; background: #f4f7f6;">
 
-    // 1. تهيئة التاريخ فور تحميل الصفحة
-    window.onload = function() {
-        const dateInput = document.getElementById('dateFilter');
-        if (!dateInput.value) {
-            dateInput.valueAsDate = new Date();
-            loadReport(); // استدعاء الدالة لجلب البيانات مباشرة
-        }
-    };
+    <div style="max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px;">
+        <a href="index.html">⬅️ عودة</a>
+        <h3 id="title">تقرير الغيابات</h3>
+        <input type="date" id="dateFilter" onchange="loadReport()">
+        <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px; text-align: center;">
+            <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
+            <tbody id="body"></tbody>
+        </table>
+    </div>
 
-    async function loadReport() {
-        const date = document.getElementById('dateFilter').value;
-        const body = document.getElementById('reportBody');
-        const reportTitle = document.getElementById('reportTitle');
-        
-        // التحقق من وجود التاريخ
-        if(!date) return;
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-        body.innerHTML = "<tr><td colspan='3'>جاري جلب البيانات...</td></tr>";
-        
-        // تحويل التاريخ لاسم يوم
-        const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
-        if(reportTitle) reportTitle.innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
+        document.getElementById('dateFilter').valueAsDate = new Date();
 
-        try {
-            // جلب البيانات من Firestore
-            const snapshot = await db.collection("attendance").get();
-            const studentsSnap = await db.collection("students").get();
-            const students = {};
-            studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
+        function loadReport() {
+            const date = document.getElementById('dateFilter').value;
+            const body = document.getElementById('body');
+            body.innerHTML = "جاري التحميل...";
 
-            let reportData = {};
-
-            snapshot.forEach(doc => {
-                // التأكد من أن معرف الوثيقة يحتوي على التاريخ المختار
-                if(doc.id.includes(date)) {
-                    const data = doc.data().data;
-                    const parts = doc.id.split('_'); 
-                    for(let sId in data) {
-                        if(data[sId] !== "حاضر") {
-                            if(!reportData[sId]) {
-                                reportData[sId] = { 
-                                    name: students[sId] || sId, 
-                                    class: `${parts[1]} - ${parts[2]}`, 
-                                    absences: [] 
-                                };
+            db.collection("attendance").get().then((snap) => {
+                body.innerHTML = "";
+                snap.forEach((doc) => {
+                    if(doc.id.startsWith(date)) {
+                        const data = doc.data().data;
+                        const parts = doc.id.split('_');
+                        
+                        for(let sId in data) {
+                            if(data[sId] !== "حاضر") {
+                                body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
                             }
-                            let lessonShort = parts[3].replace("الدرس ", "");
-                            reportData[sId].absences.push(`${lessonShort} <span class="${data[sId] === 'غائب' ? 'absent' : 'leave'}">${data[sId]}</span>`);
                         }
                     }
-                }
-            });
-
-            // عرض البيانات
-            body.innerHTML = "";
-            const sortedKeys = Object.keys(reportData).sort();
-            
-            if(sortedKeys.length === 0) {
-                body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات لهذا التاريخ</td></tr>";
-            } else {
-                sortedKeys.forEach(id => {
-                    let s = reportData[id];
-                    body.innerHTML += `<tr><td>${s.name}</td><td>${s.class}</td><td>${s.absences.join(' | ')}</td></tr>`;
                 });
-            }
-        } catch(e) {
-            console.error(e);
-            body.innerHTML = "<tr><td colspan='3'>حدث خطأ أثناء تحميل البيانات</td></tr>";
+            }).catch(err => {
+                body.innerHTML = "<tr><td colspan='3'>حدث خطأ: " + err.message + "</td></tr>";
+            });
         }
-    }
-</script>
+        loadReport();
+    </script>
+</body>
+</html>

@@ -15,7 +15,7 @@
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         .btn-save { background: #007bff; color: white; padding: 15px; border: none; border-radius: 8px; width: 100%; margin-top: 20px; cursor: pointer; }
         #backBtn { display: none; margin-bottom: 15px; padding: 10px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
-        .print-only { display: none; margin-bottom: 15px; font-weight: bold; font-size: 18px; }
+        .print-only { display: none; margin-bottom: 15px; font-weight: bold; font-size: 16px; }
 
         @media print {
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
@@ -23,6 +23,8 @@
             .print-only { display: block !important; }
             body { background: white; }
             .container { box-shadow: none; width: 100%; }
+            /* إخفاء الصفوف التي تحتوي على "حاضر" فقط عند الطباعة */
+            tr.is-present { display: none; }
         }
     </style>
 </head>
@@ -46,7 +48,7 @@
         </table>
         <textarea id="notes" placeholder="ملاحظات إضافية..." style="margin-top:10px; width:100%;"></textarea>
         <button id="saveBtn" class="btn-save" style="display:none;" onclick="saveAttendance()">إرسال الحضور</button>
-        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="preparePrint()">تصدير تقرير PDF</button>
+        <button id="pdfBtn" class="btn-save" style="display:none; background:#dc3545;" onclick="preparePrint()">تصدير تقرير الغيابات (PDF)</button>
     </div>
 
     <script>
@@ -66,7 +68,7 @@
             const date = document.getElementById('datePicker').value;
             const sub = document.getElementById('subjectSelect').value;
             const tea = document.getElementById('teacherName').value;
-            document.getElementById('printHeader').innerHTML = `${document.getElementById('pageTitle').innerText} - التاريخ: ${date}<br>المادة: ${sub} | المدرس: ${tea}`;
+            document.getElementById('printHeader').innerHTML = `تقرير غيابات/إجازات ${document.getElementById('pageTitle').innerText}<br>التاريخ: ${date} | المادة: ${sub} | المدرس: ${tea}`;
             window.print();
         }
 
@@ -98,7 +100,8 @@
                     snap.forEach(s => {
                         const status = isSubmitted ? (savedData[s.id] || "حاضر") : "حاضر";
                         const color = status === "حاضر" ? "#28a745" : (status === "غائب" ? "#dc3545" : "#ffc107");
-                        body.innerHTML += `<tr><td>${s.data().name}</td><td><button class="status-btn" style="background:${color}" ${(isSubmitted && !isAdmin) ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${s.id}">${status}</button></td></tr>`;
+                        const presentClass = status === "حاضر" ? "is-present" : "";
+                        body.innerHTML += `<tr class="${presentClass}"><td>${s.data().name}</td><td><button class="status-btn" style="background:${color}" ${(isSubmitted && !isAdmin) ? 'disabled' : ''} onclick="toggleStatus(this)" data-id="${s.id}">${status}</button></td></tr>`;
                     });
                     document.getElementById('saveBtn').style.display = (isSubmitted && !isAdmin) ? "none" : "block";
                     document.getElementById('pdfBtn').style.display = isSubmitted ? "block" : "none";
@@ -120,8 +123,7 @@
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
             db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ بنجاح!");
-                location.reload();
+                alert("✅ تم الحفظ بنجاح! يمكنك الآن طباعة التقرير.");
             });
         };
     </script>

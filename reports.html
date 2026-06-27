@@ -9,9 +9,9 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-        select, input, button { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; }
+        select, input, button { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
     </style>
 </head>
@@ -24,7 +24,7 @@
             <select id="studentSelect"><option value="all">الكل</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
-            <button onclick="generateComprehensiveReport()" style="background: #6f42c1; color: white;">عرض التقرير</button>
+            <button onclick="generateComprehensiveReport()" style="background: #6f42c1; color: white; border: none; cursor: pointer; grid-column: span 3;">عرض التقرير</button>
         </div>
         <table>
             <thead>
@@ -41,56 +41,82 @@
     </div>
 
     <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        
-        // جلب الصفوف (كما فعلنا سابقاً)
+
+        // 1. جلب الصفوف
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
-            const s = document.getElementById('classSelect');
-            classes.forEach(c => s.innerHTML += `<option value="${c}">${c}</option>`);
+            const classSelect = document.getElementById('classSelect');
+            classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
         });
 
-        // دوال loadSections و loadStudents (نفس المنطق السابق مع إضافة "الكل")
-        function loadSections() { /* نفس المنطق السابق */ }
-        function loadStudents() {
+        // 2. تحميل الشعب
+        function loadSections() {
             const c = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
-            const stu = document.getElementById('studentSelect');
-            stu.innerHTML = '<option value="all">الكل</option>';
-            db.collection("students").where("class", "==", c).where("section", "==", sec).get().then(snap => {
-                snap.forEach(doc => stu.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
+            const secSelect = document.getElementById('sectionSelect');
+            secSelect.innerHTML = '<option value="">الشعبة</option>';
+            if (!c) return;
+            db.collection("students").where("class", "==", c).get().then(snap => {
+                let sections = new Set();
+                snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
+                sections.forEach(s => secSelect.innerHTML += `<option value="${s}">${s}</option>`);
             });
         }
 
+        // 3. تحميل الطلاب
+        function loadStudents() {
+            const c = document.getElementById('classSelect').value;
+            const s = document.getElementById('sectionSelect').value;
+            const stuSelect = document.getElementById('studentSelect');
+            stuSelect.innerHTML = '<option value="all">الكل</option>';
+            if (!c || !s) return;
+            db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
+                snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
+            });
+        }
+
+        // 4. التقرير الشامل بمعادلة الـ 4 دروس
         async function generateComprehensiveReport() {
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
             const stuId = document.getElementById('studentSelect').value;
             
+            if(!dFrom || !dTo) { alert("يرجى تحديد التاريخ"); return; }
+
             const attendSnap = await db.collection("attendance").get();
+            const studentsSnap = await db.collection("students").get();
             let studentsData = {};
 
+            // تهيئة بيانات الطلاب
+            studentsSnap.forEach(doc => {
+                if(stuId === "all" || doc.id === stuId) {
+                    studentsData[doc.id] = { name: doc.data().name, absent: {}, leave: {} };
+                }
+            });
+
+            // معالجة البيانات
             attendSnap.forEach(doc => {
                 const parts = doc.id.split('_');
                 const d = parts[0];
                 if(d >= dFrom && d <= dTo) {
                     const data = doc.data().data || {};
                     Object.keys(data).forEach(sId => {
-                        if(stuId !== "all" && sId !== stuId) return;
-                        if(!studentsData[sId]) studentsData[sId] = {absent: {}, leave: {}};
-                        
-                        let status = data[sId];
-                        if(status === "غائب" || status === "مجاز") {
-                            let type = status === "غائب" ? "absent" : "leave";
-                            if(!studentsData[sId][type][d]) studentsData[sId][type][d] = 0;
-                            studentsData[sId][type][d]++;
+                        if(studentsData[sId]) {
+                            let status = data[sId];
+                            if(status === "غائب" || status === "مجاز") {
+                                let type = status === "غائب" ? "absent" : "leave";
+                                if(!studentsData[sId][type][d]) studentsData[sId][type][d] = 0;
+                                studentsData[sId][type][d]++;
+                            }
                         }
                     });
                 }
             });
 
-            // هنا سنطبق معادلة الـ 4 دروس
+            // حساب النتائج وعرضها
             let html = "";
             for(let sId in studentsData) {
                 let absDays = 0, absLessons = 0, leaveDays = 0, leaveLessons = 0;
@@ -108,9 +134,9 @@
                     }
                 });
                 
-                html += `<tr><td>${sId}</td><td>${absDays}</td><td>${absLessons}</td><td>${leaveDays}</td><td>${leaveLessons}</td></tr>`;
+                html += `<tr><td>${studentsData[sId].name}</td><td>${absDays}</td><td>${absLessons}</td><td>${leaveDays}</td><td>${leaveLessons}</td></tr>`;
             }
-            document.getElementById('reportTableBody').innerHTML = html;
+            document.getElementById('reportTableBody').innerHTML = html || "<tr><td colspan='5'>لا توجد بيانات للفترة المحددة</td></tr>";
         }
     </script>
 </body>

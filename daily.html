@@ -7,57 +7,61 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f7f6; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; }
+        .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        .absent { color: #dc3545; font-weight: bold; }
-        .leave { color: #ffc107; font-weight: bold; }
-        @media print { .no-print { display: none; } }
+        th { background: #f8f9fa; }
+        .btn-print { background: #dc3545; color: white; padding: 10px; border: none; border-radius: 8px; width: 100%; cursor: pointer; margin-top: 20px; }
+        @media print { .btn-print, .controls { display: none; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <h3>التقرير اليومي للغياب</h3>
-        <input type="date" id="datePicker" onchange="loadDailyReport()">
-        
-        <div id="stats" style="margin: 20px 0; font-weight: bold;"></div>
-
+        <h2>التقرير اليومي للغياب والإجازات</h2>
+        <div class="controls">
+            <input type="date" id="reportDate" onchange="loadFullReport()">
+        </div>
         <table id="reportTable">
-            <thead>
-                <tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>الدروس</th></tr>
-            </thead>
+            <thead><tr><th>الصف/الشعبة</th><th>الدرس</th><th>اسم الطالب</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
-        <button class="no-print" onclick="window.print()" style="margin-top:20px; padding:10px; width:100%;">طباعة التقرير (PDF)</button>
+        <button class="btn-print" onclick="window.print()">طباعة التقرير (PDF)</button>
     </div>
 
     <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-        
-        async function loadDailyReport() {
-            const date = document.getElementById('datePicker').value;
-            const reportBody = document.getElementById('reportBody');
-            reportBody.innerHTML = "";
+
+        document.getElementById('reportDate').valueAsDate = new Date();
+
+        async function loadFullReport() {
+            const date = document.getElementById('reportDate').value;
+            const body = document.getElementById('reportBody');
+            body.innerHTML = "جاري التحميل...";
             
             // جلب كل سجلات الحضور لهذا اليوم
-            const snap = await db.collection("attendance").where("date", "==", date).get(); // ملاحظة: تأكد من تخزين حقل التاريخ في كل مستند
-            
-            let studentsData = {};
+            const snap = await db.collection("attendance").where("date", "==", date).get(); // ملاحظة: تأكد من إضافة حقل التاريخ داخل وثيقة الحضور عند الحفظ
+            // بدلاً من ذلك، سنستخدم الكود الأبسط لجلب الكل:
+            const allAttendance = await db.collection("attendance").get();
+            body.innerHTML = "";
 
-            snap.forEach(doc => {
-                const data = doc.data().data;
-                for (let studentId in data) {
-                    if (data[studentId] !== "حاضر") {
-                        if (!studentsData[studentId]) {
-                            studentsData[studentId] = { name: "...", classes: [] }; // سنحتاج ربط اسم الطالب
+            for(const doc of allAttendance.docs) {
+                if(doc.id.startsWith(date)) {
+                    const data = doc.data().data;
+                    const parts = doc.id.split('_'); // [date, class, section, lesson]
+                    
+                    for(const studentId in data) {
+                        if(data[studentId] !== "حاضر") {
+                            const studentDoc = await db.collection("students").doc(studentId).get();
+                            const studentName = studentDoc.exists ? studentDoc.data().name : "غير معروف";
+                            body.innerHTML += `<tr><td>${parts[1]} - ${parts[2]}</td><td>${parts[3]}</td><td>${studentName}</td><td>${data[studentId]}</td></tr>`;
                         }
-                        studentsData[studentId].classes.push(`${doc.data().lesson}: ${data[studentId]}`);
                     }
                 }
-            });
-
-            // عرض البيانات في الجدول...
+            }
         }
+        loadFullReport();
     </script>
 </body>
 </html>

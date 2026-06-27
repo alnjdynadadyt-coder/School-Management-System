@@ -118,7 +118,7 @@
                 Object.values(dataMap[sId].lea).forEach(v => { lD += Math.floor(v/4); lL += (v%4); });
 
                 if(stuId !== "all" || (aD > 0 || aL > 0 || lD > 0 || lL > 0)) {
-                    html += `<tr><td>${dataMap[sId].name}</td><td>${aD}</td><td>${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
+                    html += `<tr><td>${dataMap[sId].name}</td><td style="color: red; font-weight: bold;">${aD}</td><td style="color: red; font-weight: bold;">${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
                 }
             }
             document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='5'>لا توجد حالات غياب/إجازة</td></tr>";

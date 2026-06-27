@@ -12,6 +12,12 @@
         .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
+        
+        /* هذا الكود يخفي الأزرار عند الطباعة للـ PDF */
+        @media print {
+            .no-print { display: none !important; }
+        }
+
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
@@ -19,9 +25,9 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="back-btn">⬅️ العودة للرئيسية</a>
+        <a href="index.html" class="back-btn no-print">⬅️ العودة للرئيسية</a>
         <h3>تقرير الطالب التفصيلي</h3>
-        <div class="controls">
+        <div class="controls no-print">
             <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
             <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
             <select id="studentSelect" style="grid-column: span 2;"><option value="">اختر الطالب</option></select>
@@ -38,10 +44,9 @@
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // تحميل البيانات الأساسية (الصف، الشعبة، الطالب)
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -96,16 +101,29 @@
                 }
             });
 
+            // ترتيب البيانات وتجميعها
             rows.sort((a, b) => a.date.localeCompare(b.date));
-            let htmlRows = rows.map(r => `<tr><td>${r.date}</td><td>${r.lesson}</td><td>${r.status}</td></tr>`).join('');
+            
+            let htmlRows = "";
+            rows.forEach(r => {
+                htmlRows += `<tr><td>${r.date}</td><td>${r.lesson}</td><td>${r.status}</td></tr>`;
+            });
             
             body.innerHTML = htmlRows || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
             summary.innerHTML = `إجمالي الغياب: ${(abs/4).toFixed(1)} يوم | الإجازات: ${(leave/4).toFixed(1)} يوم`;
         }
 
         function exportPDF() {
+            // إضافة كلاس 'no-print' للعناصر التي لا نريد ظهورها في PDF
             const element = document.querySelector('.container');
-            html2pdf().from(element).save('تقرير_الطالب.pdf');
+            const opt = {
+                margin: 5,
+                filename: 'تقرير_الطالب.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
         }
     </script>
 </body>

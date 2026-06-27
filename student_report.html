@@ -13,8 +13,12 @@
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
         
-        /* إخفاء الأزرار عند التصدير */
-        @media print { .no-print { display: none !important; } }
+        /* إخفاء الأزرار والقوائم نهائياً عند الطباعة */
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white; }
+            .container { box-shadow: none; padding: 0; }
+        }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
@@ -40,7 +44,7 @@
         </div>
         <div id="summary" style="margin-bottom: 15px; font-weight: bold; color: #6f42c1;"></div>
         <table>
-            <thead><tr><th>التاريخ</th><th>الدرس</th><th>الحالة</th></tr></thead>
+            <thead><tr><th>التاريخ</th><th>الدروس</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
     </div>
@@ -50,6 +54,7 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
+        // [وظائف التحميل تظل كما كانت...]
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -82,52 +87,40 @@
             const sId = document.getElementById('studentSelect').value;
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
-            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار الطالب والفترة الزمنية"); return; }
+            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار البيانات"); return; }
             
-            document.getElementById('reportBody').innerHTML = "جاري جلب البيانات...";
             const attendSnap = await db.collection("attendance").get();
-            let abs = 0, leave = 0, rows = [];
+            let absCount = 0, leaveCount = 0;
+            let grouped = {}; 
             
             attendSnap.forEach(doc => {
                 const parts = doc.id.split('_');
-                const docDate = parts[0]; 
-                if(docDate >= dFrom && docDate <= dTo) {
+                const d = parts[0];
+                if(d >= dFrom && d <= dTo) {
                     const data = doc.data().data || {};
                     if(data[sId] && data[sId] !== "حاضر") {
-                        // كل درس يُعامل كصف مستقل لضمان دقة البيانات
-                        rows.push({
-                            date: docDate, 
-                            lesson: parts[3] || 'درس غير محدد', 
-                            status: data[sId]
-                        });
-                        if(data[sId] === "غائب") abs++; 
-                        if(data[sId] === "مجاز") leave++;
+                        if(!grouped[d]) grouped[d] = {absent: [], leave: []};
+                        if(data[sId] === "غائب") { grouped[d].absent.push(parts[3] || 'درس'); absCount++; }
+                        if(data[sId] === "مجاز") { grouped[d].leave.push(parts[3] || 'درس'); leaveCount++; }
                     }
                 }
             });
 
-            rows.sort((a, b) => a.date.localeCompare(b.date));
             let html = "";
-            rows.forEach(r => {
-                const statusClass = r.status === "غائب" ? "status-absent" : "status-leave";
-                html += `<tr><td>${r.date}</td><td>${r.lesson}</td><td class="${statusClass}">${r.status}</td></tr>`;
+            Object.keys(grouped).sort().forEach(date => {
+                if(grouped[date].absent.length > 0) 
+                    html += `<tr><td>${date}</td><td>${grouped[date].absent.join('، ')}</td><td class="status-absent">غائب</td></tr>`;
+                if(grouped[date].leave.length > 0) 
+                    html += `<tr><td>${date}</td><td>${grouped[date].leave.join('، ')}</td><td class="status-leave">مجاز</td></tr>`;
             });
             
             document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
-            document.getElementById('summary').innerHTML = `<span class="summary-total">إجمالي الغياب: ${(abs/4).toFixed(1)} يوم</span> | الإجازات: ${(leave/4).toFixed(1)} يوم`;
+            document.getElementById('summary').innerHTML = `<span class="summary-total">إجمالي الغياب: ${(absCount/4).toFixed(1)} يوم</span> | الإجازات: ${(leaveCount/4).toFixed(1)} يوم`;
         }
 
         function exportPDF() {
-            // نحدد العنصر المراد طباعته
             const element = document.querySelector('.container');
-            const opt = {
-                margin: 5,
-                filename: 'تقرير_الطالب.pdf',
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2 },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            };
-            html2pdf().set(opt).from(element).save();
+            html2pdf().from(element).save('تقرير_الطالب.pdf');
         }
     </script>
 </body>

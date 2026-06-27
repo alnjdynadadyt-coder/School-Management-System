@@ -6,30 +6,29 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
 </head>
-<body>
-    <div style="padding: 20px;">
-        <h3>تقرير الغيابات</h3>
-        <input type="date" id="dateFilter" onchange="loadReport()">
-        <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-            <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
-            <tbody id="body"></tbody>
-        </table>
-    </div>
+<body style="padding: 20px;">
+    <h3>تقرير الغيابات</h3>
+    <input type="date" id="dateFilter" onchange="loadReport()">
+    <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+        <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
+        <tbody id="body"></tbody>
+    </table>
 
     <script>
-        // إعداد Firebase - مطابق تماماً لما يعمل لديك
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        
-        // التحقق من البدء
-        try {
-            if (!firebase.apps.length) {
-                firebase.initializeApp(firebaseConfig);
+        // استخدام setTimeout للتأكد من تحميل Firebase
+        setTimeout(function() {
+            if (typeof firebase === 'undefined') {
+                document.body.innerHTML = "<h1>خطأ: لم يتم تحميل Firebase. تأكد من اتصال الإنترنت!</h1>";
+                return;
             }
+
+            const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
 
             document.getElementById('dateFilter').valueAsDate = new Date();
 
-            function loadReport() {
+            window.loadReport = function() {
                 const date = document.getElementById('dateFilter').value;
                 const body = document.getElementById('body');
                 body.innerHTML = "جاري التحميل...";
@@ -48,12 +47,9 @@
                         }
                     });
                 });
-            }
-            // تشغيل
+            };
             loadReport();
-        } catch(e) {
-            document.body.innerHTML = "<h1>خطأ في الاتصال: " + e.message + "</h1>";
-        }
+        }, 1000); // ينتظر ثانية واحدة للتأكد من تحميل المكتبات
     </script>
 </body>
 </html>

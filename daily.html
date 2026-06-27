@@ -6,22 +6,39 @@
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        th { background-color: #4a90e2; color: white; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        #backBtn { padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px; }
+        h3 { text-align: center; color: #333; margin: 0; }
+        input[type="date"] { padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #4a90e2; color: white; padding: 12px; border: 1px solid #ddd; }
+        td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .absent { color: #d9534f; font-weight: bold; }
+        .leave { color: #f0ad4e; font-weight: bold; }
+        .btn-print { background: #28a745; color: white; padding: 12px 30px; border: none; border-radius: 8px; width: 100%; font-size: 18px; cursor: pointer; margin-top: 20px; }
+        
+        @media print {
+            .btn-print, .header-actions { display: none !important; }
+            body { background: white; }
+            .container { box-shadow: none; width: 100%; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="index.html">⬅️ عودة</a>
-        <h3>تقرير الغيابات</h3>
-        <input type="date" id="dateFilter" onchange="loadReport()">
+        <div class="header-actions">
+            <a href="index.html" id="backBtn">⬅️ عودة</a>
+            <input type="date" id="dateFilter" onchange="loadReport()">
+        </div>
+        <h3 id="reportTitle">تقرير الغيابات اليومي</h3>
+        
         <table>
-            <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
-            <tbody id="body"></tbody>
+            <thead><tr><th>اسم الطالب</th><th>الشعبة</th><th>التفاصيل</th></tr></thead>
+            <tbody id="reportBody"></tbody>
         </table>
+        <button class="btn-print" onclick="window.print()">🖨️ طباعة التقرير</button>
     </div>
 
     <script>
@@ -33,10 +50,13 @@
 
         function loadReport() {
             const date = document.getElementById('dateFilter').value;
-            const body = document.getElementById('body');
-            body.innerHTML = "جاري التحميل...";
+            const body = document.getElementById('reportBody');
+            const title = document.getElementById('reportTitle');
+            
+            const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
+            title.innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
+            body.innerHTML = "<tr><td colspan='3'>جاري جلب البيانات...</td></tr>";
 
-            // دمج جلب الطلاب مع جلب الحضور لضمان ظهور الأسماء
             Promise.all([
                 db.collection("students").get(),
                 db.collection("attendance").get()
@@ -44,77 +64,42 @@
                 const students = {};
                 studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
                 
-                body.innerHTML = "";
+                const reportData = {};
+
                 attendSnap.forEach((doc) => {
                     if(doc.id.startsWith(date)) {
                         const data = doc.data().data;
                         const parts = doc.id.split('_');
+                        const section = parts[2];
+                        const lesson = parts[3].replace("الدرس ", "");
+
                         for(let sId in data) {
                             if(data[sId] !== "حاضر") {
-                                const sName = students[sId] || "غير معروف";
-                                body.innerHTML += `<tr><td>${sName}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
+                                if(!reportData[sId]) {
+                                    reportData[sId] = { name: students[sId] || sId, section: section, absences: [] };
+                                }
+                                const statusClass = data[sId] === 'غائب' ? 'absent' : 'leave';
+                                reportData[sId].absences.push(`${lesson} <span class="${statusClass}">${data[sId]}</span>`);
                             }
                         }
                     }
                 });
-            });
-        }
-        loadReport();
-        <script>
-    // ... (نفس الإعدادات السابقة لـ firebaseConfig و db) ...
 
-    function loadReport() {
-        const date = document.getElementById('dateFilter').value;
-        const body = document.getElementById('body');
-        body.innerHTML = "جاري التحميل...";
-
-        Promise.all([
-            db.collection("students").get(),
-            db.collection("attendance").get()
-        ]).then(([studentsSnap, attendSnap]) => {
-            const students = {};
-            studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
-            
-            const reportData = {};
-
-            attendSnap.forEach((doc) => {
-                if(doc.id.startsWith(date)) {
-                    const data = doc.data().data; // بيانات الغياب
-                    const parts = doc.id.split('_'); // [التاريخ, الصف, الشعبة, الدرس]
-                    const className = parts[1];
-                    const sectionName = parts[2]; // الشعبة
-                    const lesson = parts[3].replace("الدرس ", ""); // اختصار "الدرس الأول" إلى "الأول"
-
-                    for(let sId in data) {
-                        if(data[sId] !== "حاضر") {
-                            if(!reportData[sId]) {
-                                reportData[sId] = { 
-                                    name: students[sId] || sId, 
-                                    section: sectionName, 
-                                    absences: [] 
-                                };
-                            }
-                            // تجميع الحالة: (الأول غائب)
-                            reportData[sId].absences.push(`${lesson} ${data[sId]}`);
-                        }
-                    }
+                body.innerHTML = "";
+                const sortedIds = Object.keys(reportData).sort((a, b) => reportData[a].name.localeCompare(reportData[b].name));
+                
+                if(sortedIds.length === 0) {
+                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات مسجلة لهذا اليوم</td></tr>";
+                } else {
+                    sortedIds.forEach(id => {
+                        let s = reportData[id];
+                        body.innerHTML += `<tr><td>${s.name}</td><td>${s.section}</td><td>${s.absences.join(' | ')}</td></tr>`;
+                    });
                 }
             });
-
-            body.innerHTML = "";
-            for(let id in reportData) {
-                let s = reportData[id];
-                body.innerHTML += `<tr>
-                    <td>${s.name}</td>
-                    <td>${s.section}</td>
-                    <td>${s.absences.join(' | ')}</td>
-                </tr>`;
-            }
-        });
-    }
-    loadReport();
-</script>
-
+        }
+        
+        loadReport();
     </script>
 </body>
 </html>

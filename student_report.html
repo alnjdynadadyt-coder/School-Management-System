@@ -43,7 +43,7 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 1. تحميل الصفوف عند تحميل الصفحة
+        // تحميل الصفوف تلقائياً عند فتح الصفحة
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -51,12 +51,10 @@
             classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
         });
 
-        // 2. تحميل الشعب بناءً على الصف
         function loadSections() {
             const c = document.getElementById('classSelect').value;
             const secSelect = document.getElementById('sectionSelect');
             secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
-            if(!c) return;
             db.collection("students").where("class", "==", c).get().then(snap => {
                 let sections = new Set();
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
@@ -64,20 +62,49 @@
             });
         }
 
-        // 3. تحميل الطلاب بناءً على الصف والشعبة
         function loadStudents() {
             const c = document.getElementById('classSelect').value;
             const s = document.getElementById('sectionSelect').value;
             const stuSelect = document.getElementById('studentSelect');
             stuSelect.innerHTML = '<option value="">اختر الطالب</option>';
-            if(!c || !s) return;
             db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
                 snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
         }
 
-        async function generateReport() { /* كود التقرير كما هو معتمد */ }
-        function exportPDF() { /* كود التصدير كما هو معتمد */ }
+        async function generateReport() {
+            const sId = document.getElementById('studentSelect').value;
+            const dFrom = document.getElementById('dateFrom').value;
+            const dTo = document.getElementById('dateTo').value;
+            const body = document.getElementById('reportBody');
+            const summary = document.getElementById('summary');
+            
+            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار الطالب والفترة الزمنية"); return; }
+            body.innerHTML = "جاري جلب البيانات...";
+            
+            const attendSnap = await db.collection("attendance").get();
+            let abs = 0, leave = 0, rows = [];
+            
+            attendSnap.forEach(doc => {
+                const parts = doc.id.split('_');
+                const docDate = parts[0]; 
+                if(docDate >= dFrom && docDate <= dTo) {
+                    const data = doc.data().data || {};
+                    if(data[sId] && data[sId] !== "حاضر") {
+                        if(data[sId] === "غائب") abs++; 
+                        if(data[sId] === "مجاز") leave++;
+                        rows.push({date: docDate, lesson: parts[3] || 'غير محدد', status: data[sId]});
+                    }
+                }
+            });
+            rows.sort((a, b) => a.date.localeCompare(b.date));
+            body.innerHTML = rows.map(r => `<tr><td>${r.date}</td><td>${r.lesson}</td><td>${r.status}</td></tr>`).join('') || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
+            summary.innerHTML = `إجمالي الغياب: ${(abs/4).toFixed(1)} يوم | الإجازات: ${(leave/4).toFixed(1)} يوم`;
+        }
+
+        function exportPDF() {
+            html2pdf().from(document.querySelector('.container')).save('تقرير_الطالب.pdf');
+        }
     </script>
 </body>
 </html>

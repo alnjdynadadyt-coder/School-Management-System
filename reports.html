@@ -5,7 +5,6 @@
     <title>التقرير الشامل</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
@@ -24,8 +23,8 @@
         <a href="index.html" class="no-print" style="display:block; margin-bottom:15px; text-decoration:none;">⬅️ عودة للرئيسية</a>
         <h3>التقرير الشامل للطلاب</h3>
         <div class="controls">
-            <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
-            <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
+            <select id="classSelect"><option value="">اختر الصف</option></select>
+            <select id="sectionSelect"><option value="">اختر الشعبة</option></select>
             <select id="studentSelect"><option value="all">الكل</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
@@ -41,20 +40,23 @@
     </div>
 
     <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // تحميل الصفوف فور فتح الصفحة
-        window.onload = () => {
+        // 1. تحميل الصفوف عند تحميل الصفحة
+        document.addEventListener('DOMContentLoaded', () => {
+            const classSelect = document.getElementById('classSelect');
             db.collection("students").get().then(snap => {
                 let classes = new Set();
                 snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
-                const classSelect = document.getElementById('classSelect');
                 classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
             });
-        };
+        });
 
-        function loadSections() {
-            const c = document.getElementById('classSelect').value;
+        // 2. ربط الأحداث يدوياً لضمان العمل
+        document.getElementById('classSelect').addEventListener('change', function() {
+            const c = this.value;
             const secSelect = document.getElementById('sectionSelect');
             secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
             if(!c) return;
@@ -63,18 +65,18 @@
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
                 sections.forEach(s => secSelect.innerHTML += `<option value="${s}">${s}</option>`);
             });
-        }
+        });
 
-        function loadStudents() {
+        document.getElementById('sectionSelect').addEventListener('change', function() {
             const c = document.getElementById('classSelect').value;
-            const s = document.getElementById('sectionSelect').value;
+            const s = this.value;
             const stuSelect = document.getElementById('studentSelect');
             stuSelect.innerHTML = '<option value="all">الكل</option>';
             if(!s) return;
             db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
                 snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
-        }
+        });
 
         async function generateReport() {
             const dFrom = document.getElementById('dateFrom').value;
@@ -83,7 +85,7 @@
             const s = document.getElementById('sectionSelect').value;
             const stuId = document.getElementById('studentSelect').value;
 
-            if(!c || !s || !dFrom || !dTo) { alert("يرجى ملء جميع الحقول"); return; }
+            if(!c || !s || !dFrom || !dTo) { alert("يرجى اختيار الصف والشعبة والتاريخ"); return; }
 
             const attendSnap = await db.collection("attendance").get();
             const stuSnap = await db.collection("students").where("class", "==", c).where("section", "==", s).get();
@@ -115,7 +117,6 @@
                 Object.values(dataMap[sId].abs).forEach(v => { aD += Math.floor(v/4); aL += (v%4); });
                 Object.values(dataMap[sId].lea).forEach(v => { lD += Math.floor(v/4); lL += (v%4); });
 
-                // المنطق: إذا كان "الكل" يظهر فقط من لديه حالات، إذا طالب محدد يظهر دائماً
                 if(stuId !== "all" || (aD > 0 || aL > 0 || lD > 0 || lL > 0)) {
                     html += `<tr><td>${dataMap[sId].name}</td><td>${aD}</td><td>${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
                 }

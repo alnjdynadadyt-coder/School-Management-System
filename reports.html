@@ -10,81 +10,88 @@
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
         .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
         .controls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
-        select, input, button { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
-        .btn-only { padding: 10px; border-radius: 8px; border: none; cursor: pointer; color: white; background: #6f42c1; }
+        select, input { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; }
+        .btns-container { display: flex; gap: 10px; grid-column: span 3; }
+        .btn-action { flex: 1; padding: 12px; border: none; border-radius: 8px; cursor: pointer; color: white; font-weight: bold; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
-        @media print { .btn-only { display: none !important; } }
+        @media print { .no-print { display: none !important; } }
     </style>
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="btn-only" style="display:inline-block; text-decoration:none; margin-bottom:10px; background:#6c757d;">⬅️ العودة للرئيسية</a>
+        <a href="index.html" class="no-print" style="display:block; margin-bottom:15px; text-decoration:none;">⬅️ عودة للرئيسية</a>
         <h3>التقرير الشامل للطلاب</h3>
         <div class="controls">
-            <select id="classSelect" onchange="loadSections()"><option value="">الصف</option></select>
-            <select id="sectionSelect" onchange="loadStudents()"><option value="">الشعبة</option></select>
+            <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
+            <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
             <select id="studentSelect"><option value="all">الكل</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
-            <button class="btn-only" onclick="generateComprehensiveReport()">عرض التقرير</button>
-            <button class="btn-only" onclick="exportPDF()" style="background:#28a745;">تصدير PDF 📄</button>
+            <div class="btns-container">
+                <button class="btn-action" onclick="generateReport()" style="background: #6f42c1;">عرض التقرير</button>
+                <button class="btn-action no-print" onclick="window.print()" style="background: #28a745;">طباعة PDF 🖨️</button>
+            </div>
         </div>
         <table>
             <thead><tr><th>اسم الطالب</th><th>أيام غياب</th><th>دروس غياب</th><th>أيام إجازة</th><th>دروس إجازة</th></tr></thead>
-            <tbody id="reportTableBody"></tbody>
+            <tbody id="reportBody"></tbody>
         </table>
     </div>
 
     <script>
         const db = firebase.firestore();
 
-        // [تحميل البيانات]
-        db.collection("students").get().then(snap => {
-            let classes = new Set();
-            snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
-            const s = document.getElementById('classSelect');
-            classes.forEach(c => s.innerHTML += `<option value="${c}">${c}</option>`);
-        });
+        // تحميل الصفوف فور فتح الصفحة
+        window.onload = () => {
+            db.collection("students").get().then(snap => {
+                let classes = new Set();
+                snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
+                const classSelect = document.getElementById('classSelect');
+                classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
+            });
+        };
 
         function loadSections() {
             const c = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect');
-            sec.innerHTML = '<option value="">الشعبة</option>';
+            const secSelect = document.getElementById('sectionSelect');
+            secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
+            if(!c) return;
             db.collection("students").where("class", "==", c).get().then(snap => {
                 let sections = new Set();
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
-                sections.forEach(s => sec.innerHTML += `<option value="${s}">${s}</option>`);
+                sections.forEach(s => secSelect.innerHTML += `<option value="${s}">${s}</option>`);
             });
         }
 
         function loadStudents() {
             const c = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
-            const stu = document.getElementById('studentSelect');
-            stu.innerHTML = '<option value="all">الكل</option>';
-            db.collection("students").where("class", "==", c).where("section", "==", sec).get().then(snap => {
-                snap.forEach(doc => stu.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
+            const s = document.getElementById('sectionSelect').value;
+            const stuSelect = document.getElementById('studentSelect');
+            stuSelect.innerHTML = '<option value="all">الكل</option>';
+            if(!s) return;
+            db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
+                snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
         }
 
-        async function generateComprehensiveReport() {
+        async function generateReport() {
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
-            const stuId = document.getElementById('studentSelect').value;
             const c = document.getElementById('classSelect').value;
-            const sec = document.getElementById('sectionSelect').value;
+            const s = document.getElementById('sectionSelect').value;
+            const stuId = document.getElementById('studentSelect').value;
 
-            if(!dFrom || !dTo) { alert("حدد التاريخ"); return; }
+            if(!c || !s || !dFrom || !dTo) { alert("يرجى ملء جميع الحقول"); return; }
 
             const attendSnap = await db.collection("attendance").get();
-            const studentsSnap = await db.collection("students").where("class", "==", c).where("section", "==", sec).get();
+            const stuSnap = await db.collection("students").where("class", "==", c).where("section", "==", s).get();
             
-            let reportData = {};
-            studentsSnap.forEach(doc => {
+            let dataMap = {};
+            stuSnap.forEach(doc => {
                 if(stuId === "all" || doc.id === stuId) {
-                    reportData[doc.id] = { name: doc.data().name, abs: {}, lea: {} };
+                    dataMap[doc.id] = { name: doc.data().name, abs: {}, lea: {} };
                 }
             });
 
@@ -92,36 +99,28 @@
                 const parts = doc.id.split('_');
                 const d = parts[0];
                 if(d >= dFrom && d <= dTo) {
-                    const data = doc.data().data || {};
-                    Object.keys(data).forEach(sId => {
-                        if(reportData[sId]) {
-                            if(data[sId] === "غائب") { reportData[sId].abs[d] = (reportData[sId].abs[d] || 0) + 1; }
-                            if(data[sId] === "مجاز") { reportData[sId].lea[d] = (reportData[sId].lea[d] || 0) + 1; }
+                    const rowData = doc.data().data || {};
+                    Object.keys(rowData).forEach(sId => {
+                        if(dataMap[sId]) {
+                            if(rowData[sId] === "غائب") dataMap[sId].abs[d] = (dataMap[sId].abs[d] || 0) + 1;
+                            if(rowData[sId] === "مجاز") dataMap[sId].lea[d] = (dataMap[sId].lea[d] || 0) + 1;
                         }
                     });
                 }
             });
 
             let html = "";
-            for(let sId in reportData) {
-                let aD = 0, aL = 0, lD = 0, lL = 0;
-                for(let d in reportData[sId].abs) { aD += Math.floor(reportData[sId].abs[d]/4); aL += (reportData[sId].abs[d]%4); }
-                for(let d in reportData[sId].lea) { lD += Math.floor(reportData[sId].lea[d]/4); lL += (reportData[sId].lea[d]%4); }
+            for(let sId in dataMap) {
+                let aD=0, aL=0, lD=0, lL=0;
+                Object.values(dataMap[sId].abs).forEach(v => { aD += Math.floor(v/4); aL += (v%4); });
+                Object.values(dataMap[sId].lea).forEach(v => { lD += Math.floor(v/4); lL += (v%4); });
 
-                // شرط إظهار الطالب فقط إذا كان لديه حالات أو إذا كان مختاراً تحديداً
+                // المنطق: إذا كان "الكل" يظهر فقط من لديه حالات، إذا طالب محدد يظهر دائماً
                 if(stuId !== "all" || (aD > 0 || aL > 0 || lD > 0 || lL > 0)) {
-                    html += `<tr><td>${reportData[sId].name}</td><td>${aD}</td><td>${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
+                    html += `<tr><td>${dataMap[sId].name}</td><td>${aD}</td><td>${aL}</td><td>${lD}</td><td>${lL}</td></tr>`;
                 }
             }
-            document.getElementById('reportTableBody').innerHTML = html || "<tr><td colspan='5'>لا توجد حالات مسجلة</td></tr>";
-        }
-
-        function exportPDF() {
-            const el = document.querySelector('.container');
-            document.querySelectorAll('.btn-only').forEach(b => b.style.display = 'none');
-            html2pdf().from(el).set({margin:5, filename:'التقرير_الشامل.pdf', html2canvas:{scale:2}}).save().then(() => {
-                document.querySelectorAll('.btn-only').forEach(b => b.style.display = '');
-            });
+            document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='5'>لا توجد حالات غياب/إجازة</td></tr>";
         }
     </script>
 </body>

@@ -13,12 +13,17 @@
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
         
-        /* إخفاء الأزرار عند تصدير PDF */
+        /* إخفاء الأزرار عند الطباعة/PDF */
         @media print { .no-print { display: none !important; } }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
+
+        /* الألوان المطلوبة */
+        .status-absent { color: red; font-weight: bold; }
+        .status-leave { color: orange; font-weight: bold; }
+        .summary-total { color: red; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -36,7 +41,7 @@
         </div>
         <div id="summary" style="margin-bottom: 15px; font-weight: bold; color: #6f42c1;"></div>
         <table>
-            <thead><tr><th>التاريخ</th><th>الدروس المسجلة</th><th>الحالة</th></tr></thead>
+            <thead><tr><th>التاريخ</th><th>الدروس</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
     </div>
@@ -46,7 +51,6 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 1. تحميل الصفوف عند فتح الصفحة
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -54,7 +58,6 @@
             classes.forEach(c => classSelect.innerHTML += `<option value="${c}">${c}</option>`);
         });
 
-        // 2. تحميل الشعب بناءً على الصف
         function loadSections() {
             const c = document.getElementById('classSelect').value;
             const secSelect = document.getElementById('sectionSelect');
@@ -67,7 +70,6 @@
             });
         }
 
-        // 3. تحميل الطلاب بناءً على الصف والشعبة
         function loadStudents() {
             const c = document.getElementById('classSelect').value;
             const s = document.getElementById('sectionSelect').value;
@@ -79,8 +81,44 @@
             });
         }
 
-        async function generateReport() { /* كود التقرير المعتاد */ }
-        function exportPDF() { html2pdf().from(document.querySelector('.container')).save('تقرير_الطالب.pdf'); }
+        async function generateReport() {
+            const sId = document.getElementById('studentSelect').value;
+            const dFrom = document.getElementById('dateFrom').value;
+            const dTo = document.getElementById('dateTo').value;
+            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار الطالب والفترة الزمنية"); return; }
+            
+            document.getElementById('reportBody').innerHTML = "جاري جلب البيانات...";
+            const attendSnap = await db.collection("attendance").get();
+            let abs = 0, leave = 0, grouped = {};
+            
+            attendSnap.forEach(doc => {
+                const parts = doc.id.split('_');
+                const docDate = parts[0]; 
+                if(docDate >= dFrom && docDate <= dTo) {
+                    const data = doc.data().data || {};
+                    if(data[sId] && data[sId] !== "حاضر") {
+                        if(!grouped[docDate]) grouped[docDate] = {lessons: [], status: data[sId]};
+                        grouped[docDate].lessons.push(parts[3] || 'غير محدد');
+                        if(data[sId] === "غائب") abs++; 
+                        if(data[sId] === "مجاز") leave++;
+                    }
+                }
+            });
+
+            let html = "";
+            Object.keys(grouped).sort().forEach(date => {
+                const statusClass = grouped[date].status === "غائب" ? "status-absent" : "status-leave";
+                html += `<tr><td>${date}</td><td>${grouped[date].lessons.join('، ')}</td><td class="${statusClass}">${grouped[date].status}</td></tr>`;
+            });
+            
+            document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
+            document.getElementById('summary').innerHTML = `<span class="summary-total">إجمالي الغياب: ${(abs/4).toFixed(1)} يوم</span> | الإجازات: ${(leave/4).toFixed(1)} يوم`;
+        }
+
+        function exportPDF() {
+            const element = document.querySelector('.container');
+            html2pdf().from(element).save('تقرير_الطالب.pdf');
+        }
     </script>
 </body>
 </html>

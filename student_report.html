@@ -13,11 +13,9 @@
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
         
-        /* التعديل الجوهري لإخفاء الأزرار تماماً عند الطباعة */
+        /* إخفاء العناصر التي تحمل كلاس btn-only فقط */
         @media print {
-            .no-print { display: none !important; }
-            .container { box-shadow: none; border: none; padding: 0; }
-            body { background: white; }
+            .btn-only { display: none !important; }
         }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -31,16 +29,16 @@
 </head>
 <body>
     <div class="container">
-        <a href="index.html" class="back-btn no-print">⬅️ العودة للرئيسية</a>
+        <a href="index.html" class="back-btn btn-only">⬅️ العودة للرئيسية</a>
         <h3>تقرير الطالب التفصيلي</h3>
-        <div class="controls no-print">
+        <div class="controls">
             <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
             <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
             <select id="studentSelect" style="grid-column: span 2;"><option value="">اختر الطالب</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
-            <button onclick="generateReport()" style="background: #6f42c1; color: white; border: none; cursor: pointer;">عرض التقرير</button>
-            <button onclick="exportPDF()" style="background: #28a745; color: white; border: none; cursor: pointer;">تصدير PDF 📄</button>
+            <button class="btn-only" onclick="generateReport()" style="background: #6f42c1; color: white; border: none; cursor: pointer;">عرض التقرير</button>
+            <button class="btn-only" onclick="exportPDF()" style="background: #28a745; color: white; border: none; cursor: pointer;">تصدير PDF 📄</button>
         </div>
         <div id="summary" style="margin-bottom: 15px; font-weight: bold; color: #6f42c1;"></div>
         <table>
@@ -50,11 +48,11 @@
     </div>
 
     <script>
+        // ... (نفس كود السكريبت السابق) ...
         const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // [وظائف التحميل]
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -118,22 +116,17 @@
             document.getElementById('summary').innerHTML = `<span class="summary-total">إجمالي الغياب: ${(absCount/4).toFixed(1)} يوم</span> | الإجازات: ${(leaveCount/4).toFixed(1)} يوم`;
         }
 
-                function exportPDF() {
-            // تحديد العناصر المراد إخفاؤها
-            const elementsToHide = document.querySelectorAll('.no-print');
-            
-            // إخفاء الأزرار مؤقتاً
+        function exportPDF() {
+            const elementsToHide = document.querySelectorAll('.btn-only');
             elementsToHide.forEach(el => el.style.display = 'none');
 
             const element = document.querySelector('.container');
-            
             html2pdf().from(element).set({
                 margin: 5,
                 filename: 'تقرير_الطالب.pdf',
                 html2canvas: { scale: 2 },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
             }).save().then(() => {
-                // إعادة الأزرار للظهور بعد انتهاء الحفظ
                 elementsToHide.forEach(el => el.style.display = '');
             });
         }

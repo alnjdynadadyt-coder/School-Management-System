@@ -8,8 +8,8 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; background: #f4f4f9; padding: 20px; }
         .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
-        .controls { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
-        input { padding: 10px; border-radius: 8px; border: 1px solid #ccc; }
+        .controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        select, input { padding: 10px; border-radius: 8px; border: 1px solid #ccc; width: 100%; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background: #6f42c1; color: white; }
@@ -19,14 +19,14 @@
     <div class="container">
         <h3>تقرير الطالب التفصيلي</h3>
         <div class="controls">
-            <input type="text" id="studentName" placeholder="أدخل اسم الطالب الكامل...">
+            <select id="classSelect" onchange="loadSections()"><option value="">اختر الصف</option></select>
+            <select id="sectionSelect" onchange="loadStudents()"><option value="">اختر الشعبة</option></select>
+            <select id="studentSelect" style="grid-column: span 2;"><option value="">اختر الطالب</option></select>
             <input type="date" id="dateFrom">
             <input type="date" id="dateTo">
-            <button onclick="generateReport()" style="padding: 10px; background: #6f42c1; color: white; border: none; border-radius: 8px; cursor: pointer;">عرض التقرير</button>
+            <button onclick="generateReport()" style="grid-column: span 2; padding: 10px; background: #6f42c1; color: white; border: none; border-radius: 8px; cursor: pointer;">عرض التقرير</button>
         </div>
-        
         <div id="summary" style="margin-bottom: 15px; font-weight: bold;"></div>
-        
         <table>
             <thead><tr><th>التاريخ</th><th>الدرس</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
@@ -34,49 +34,58 @@
     </div>
 
     <script>
-        // إعدادات Firebase (نفس التي تستخدمها في باقي الصفحات)
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
+        
+        // تحميل الصفوف عند فتح الصفحة
+        db.collection("students").get().then(snap => {
+            let classes = new Set();
+            snap.forEach(doc => classes.add(doc.data().class));
+            classes.forEach(c => document.getElementById('classSelect').innerHTML += `<option value="${c}">${c}</option>`);
+        });
+
+        function loadSections() {
+            const c = document.getElementById('classSelect').value;
+            db.collection("students").where("class", "==", c).get().then(snap => {
+                let sections = new Set();
+                snap.forEach(doc => sections.add(doc.data().section));
+                document.getElementById('sectionSelect').innerHTML = '<option value="">اختر الشعبة</option>';
+                sections.forEach(s => document.getElementById('sectionSelect').innerHTML += `<option value="${s}">${s}</option>`);
+            });
+        }
+
+        function loadStudents() {
+            const c = document.getElementById('classSelect').value;
+            const s = document.getElementById('sectionSelect').value;
+            db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
+                document.getElementById('studentSelect').innerHTML = '<option value="">اختر الطالب</option>';
+                snap.forEach(doc => document.getElementById('studentSelect').innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
+            });
+        }
 
         async function generateReport() {
-            const sName = document.getElementById('studentName').value;
+            const sId = document.getElementById('studentSelect').value;
             const dFrom = document.getElementById('dateFrom').value;
             const dTo = document.getElementById('dateTo').value;
-            const body = document.getElementById('reportBody');
-            const summary = document.getElementById('summary');
+            if(!sId || !dFrom || !dTo) { alert("يرجى اختيار الطالب والفترة الزمنية"); return; }
             
+            const body = document.getElementById('reportBody');
             body.innerHTML = "جاري البحث...";
             
-            // 1. العثور على الطالب
-            const studentsSnap = await db.collection("students").where("name", "==", sName).get();
-            if(studentsSnap.empty) { body.innerHTML = "الطالب غير موجود!"; return; }
-            const sId = studentsSnap.docs[0].id;
-
-            // 2. جلب الحضور
             const attendSnap = await db.collection("attendance").get();
-            let absencesCount = 0;
-            let leavesCount = 0;
-            let rows = "";
-
+            let abs = 0, leave = 0, rows = "";
+            
             attendSnap.forEach(doc => {
                 const date = doc.id.split('_')[0];
                 if(date >= dFrom && date <= dTo) {
                     const data = doc.data().data;
                     if(data[sId] && data[sId] !== "حاضر") {
-                        if(data[sId] === "غائب") absencesCount++;
-                        if(data[sId] === "مجاز") leavesCount++;
+                        if(data[sId] === "غائب") abs++; else leave++;
                         rows += `<tr><td>${date}</td><td>${doc.id.split('_')[3]}</td><td>${data[sId]}</td></tr>`;
                     }
                 }
             });
-
-            // 3. الحسابات
-            const totalAbsenceDays = (absencesCount / 4).toFixed(2);
-            const totalLeaveDays = (leavesCount / 4).toFixed(2);
-
-            body.innerHTML = rows || "<tr><td colspan='3'>لا توجد سجلات في هذه الفترة</td></tr>";
-            summary.innerHTML = `الغياب: ${totalAbsenceDays} يوم | الإجازات: ${totalLeaveDays} يوم`;
+            body.innerHTML = rows || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
+            document.getElementById('summary').innerHTML = `إجمالي الغياب: ${(abs/4).toFixed(2)} يوم | الإجازات: ${(leave/4).toFixed(2)} يوم`;
         }
     </script>
 </body>

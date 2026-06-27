@@ -112,7 +112,12 @@
                                     };
                                 }
                                 const lesson = parts[3].replace("الدرس ", "");
-                                reportData[studentId].absences.push(`${lesson} (${data[studentId]})`);
+                                // تعديل للتمييز اللوني
+const status = data[studentId];
+const color = status === "غائب" ? "#e74c3c" : "#f39c12"; // الأحمر للغائب، البرتقالي للمجاز
+reportData[studentId].absences.push(
+    `${lesson} (<span style="color:${color}; font-weight:bold;">${status}</span>)`
+);
                             }
                         }
                     }

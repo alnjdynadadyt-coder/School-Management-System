@@ -2,7 +2,7 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>حذف سجلات الحضور</title>
+    <title>حذف وأرشفة السجلات</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
@@ -15,7 +15,7 @@
 <body>
     <div class="container">
         <a href="index.html" style="display: block; margin-bottom: 20px; color: #6c757d; text-decoration: none;">⬅️ العودة للرئيسية</a>
-        <h3>🗑️ حذف سجلات الحضور</h3>
+        <h3>🗑️ حذف وأرشفة سجلات الحضور</h3>
         
         <select id="classSelect"><option value="">اختر الصف</option></select>
         <select id="sectionSelect"><option value="">اختر الشعبة</option></select>
@@ -24,7 +24,7 @@
         <input type="date" id="dateTo">
         <input type="password" id="adminPass" placeholder="أدخل كلمة مرور الإدارة">
         
-        <button onclick="performDelete()">حذف السجلات المحددة</button>
+        <button onclick="archiveAndDelete()">أرشفة وحذف السجلات المحددة</button>
     </div>
 
     <script>
@@ -32,7 +32,6 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // 1. تحميل القوائم تلقائياً
         document.addEventListener('DOMContentLoaded', () => {
             db.collection("students").get().then(snap => {
                 let classes = new Set();
@@ -42,7 +41,6 @@
             });
         });
 
-        // 2. تحميل الشعب
         document.getElementById('classSelect').addEventListener('change', function() {
             const secSelect = document.getElementById('sectionSelect');
             secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
@@ -53,7 +51,6 @@
             });
         });
 
-        // 3. تحميل الطلاب
         document.getElementById('sectionSelect').addEventListener('change', function() {
             const c = document.getElementById('classSelect').value;
             const stuSelect = document.getElementById('studentSelect');
@@ -63,8 +60,7 @@
             });
         });
 
-        // 4. عملية الحذف الذكية
-        async function performDelete() {
+        async function archiveAndDelete() {
             if (document.getElementById('adminPass').value !== "12345") { alert("كلمة المرور غير صحيحة!"); return; }
             
             const dFrom = document.getElementById('dateFrom').value;
@@ -75,10 +71,8 @@
             
             if(!c || !s || !dFrom || !dTo) { alert("يرجى ملء جميع الحقول!"); return; }
 
-            // جلب الطلاب في الصف المختار فقط
             const studentsSnap = await db.collection("students").where("class", "==", c).where("section", "==", s).get();
             const targetIds = studentsSnap.docs.map(doc => doc.id);
-            
             const attendanceSnap = await db.collection("attendance").get();
             const batch = db.batch();
             let count = 0;
@@ -88,30 +82,41 @@
                 if (date >= dFrom && date <= dTo) {
                     let data = doc.data().data || {};
                     let updated = false;
+                    let archivedData = {};
 
                     if (stuId === "all") {
-                        // حذف طلاب الصف والشعبة المختارين فقط
                         targetIds.forEach(id => {
-                            if (data[id]) { delete data[id]; updated = true; }
+                            if (data[id]) { 
+                                archivedData[id] = data[id];
+                                delete data[id]; 
+                                updated = true; 
+                            }
                         });
                     } else if (data[stuId]) {
-                        // حذف طالب واحد محدد
+                        archivedData[stuId] = data[stuId];
                         delete data[stuId];
                         updated = true;
                     }
 
                     if (updated) {
+                        // 1. أرشفة السجلات
+                        batch.set(db.collection("archived_attendance").doc(doc.id + "_" + Date.now()), {
+                            data: archivedData,
+                            originalDate: doc.id,
+                            archivedAt: new Date().toISOString()
+                        });
+                        // 2. تحديث السجل الأصلي
                         batch.update(doc.ref, { data: data });
                         count++;
                     }
                 }
             });
 
-            if (count === 0) { alert("لا توجد سجلات مطابقة للحذف."); return; }
-            if (!confirm("⚠️ هل أنت متأكد؟ سيتم حذف " + count + " سجل.")) return;
+            if (count === 0) { alert("لا توجد سجلات مطابقة للأرشفة."); return; }
+            if (!confirm("⚠️ سيتم أرشفة " + count + " سجل. هل أنت متأكد؟")) return;
 
             await batch.commit();
-            alert("تم الحذف بنجاح!");
+            alert("تمت الأرشفة بنجاح!");
             location.reload();
         }
     </script>

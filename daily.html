@@ -5,51 +5,61 @@
     <title>التقرير اليومي</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #4a90e2; color: white; }
+    </style>
 </head>
-<body style="padding: 20px;">
-    <h3>تقرير الغيابات</h3>
-    <input type="date" id="dateFilter" onchange="loadReport()">
-    <table border="1" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
-        <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
-        <tbody id="body"></tbody>
-    </table>
+<body>
+    <div class="container">
+        <a href="index.html">⬅️ عودة</a>
+        <h3>تقرير الغيابات</h3>
+        <input type="date" id="dateFilter" onchange="loadReport()">
+        <table>
+            <thead><tr><th>الاسم</th><th>الصف</th><th>التفاصيل</th></tr></thead>
+            <tbody id="body"></tbody>
+        </table>
+    </div>
 
     <script>
-        // استخدام setTimeout للتأكد من تحميل Firebase
-        setTimeout(function() {
-            if (typeof firebase === 'undefined') {
-                document.body.innerHTML = "<h1>خطأ: لم يتم تحميل Firebase. تأكد من اتصال الإنترنت!</h1>";
-                return;
-            }
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
 
-            const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-            if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-            const db = firebase.firestore();
+        document.getElementById('dateFilter').valueAsDate = new Date();
 
-            document.getElementById('dateFilter').valueAsDate = new Date();
+        function loadReport() {
+            const date = document.getElementById('dateFilter').value;
+            const body = document.getElementById('body');
+            body.innerHTML = "جاري التحميل...";
 
-            window.loadReport = function() {
-                const date = document.getElementById('dateFilter').value;
-                const body = document.getElementById('body');
-                body.innerHTML = "جاري التحميل...";
-
-                db.collection("attendance").get().then((snap) => {
-                    body.innerHTML = "";
-                    snap.forEach((doc) => {
-                        if(doc.id.startsWith(date)) {
-                            const data = doc.data().data;
-                            const parts = doc.id.split('_');
-                            for(let sId in data) {
-                                if(data[sId] !== "حاضر") {
-                                    body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
-                                }
+            // دمج جلب الطلاب مع جلب الحضور لضمان ظهور الأسماء
+            Promise.all([
+                db.collection("students").get(),
+                db.collection("attendance").get()
+            ]).then(([studentsSnap, attendSnap]) => {
+                const students = {};
+                studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
+                
+                body.innerHTML = "";
+                attendSnap.forEach((doc) => {
+                    if(doc.id.startsWith(date)) {
+                        const data = doc.data().data;
+                        const parts = doc.id.split('_');
+                        for(let sId in data) {
+                            if(data[sId] !== "حاضر") {
+                                const sName = students[sId] || "غير معروف";
+                                body.innerHTML += `<tr><td>${sName}</td><td>${parts[1]}</td><td>${parts[3]} - ${data[sId]}</td></tr>`;
                             }
                         }
-                    });
+                    }
                 });
-            };
-            loadReport();
-        }, 1000); // ينتظر ثانية واحدة للتأكد من تحميل المكتبات
+            });
+        }
+        loadReport();
     </script>
 </body>
 </html>

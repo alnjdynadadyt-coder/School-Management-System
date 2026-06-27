@@ -13,11 +13,11 @@
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
         
-        /* إخفاء الأزرار والقوائم نهائياً عند الطباعة */
+        /* التعديل الجوهري لإخفاء الأزرار تماماً عند الطباعة */
         @media print {
             .no-print { display: none !important; }
+            .container { box-shadow: none; border: none; padding: 0; }
             body { background: white; }
-            .container { box-shadow: none; padding: 0; }
         }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
@@ -54,7 +54,7 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
 
-        // [وظائف التحميل تظل كما كانت...]
+        // [وظائف التحميل]
         db.collection("students").get().then(snap => {
             let classes = new Set();
             snap.forEach(doc => { if(doc.data().class) classes.add(doc.data().class); });
@@ -120,7 +120,13 @@
 
         function exportPDF() {
             const element = document.querySelector('.container');
-            html2pdf().from(element).save('تقرير_الطالب.pdf');
+            // التأكد من أن الأزرار لن تظهر في ملف الـ PDF
+            html2pdf().from(element).set({
+                margin: 5,
+                filename: 'تقرير_الطالب.pdf',
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).save();
         }
     </script>
 </body>

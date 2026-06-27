@@ -1,3 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <title>التقرير اليومي</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f4f4f4; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 10px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #4a90e2; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="index.html">⬅️ عودة</a>
+        <h3>تقرير الغيابات اليومي</h3>
+        <input type="date" id="dateFilter" onchange="loadReport()">
+        <table>
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>الصف</th>
+                    <th>التفاصيل</th>
+                </tr>
+            </thead>
+            <tbody id="body"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
+        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        document.getElementById('dateFilter').valueAsDate = new Date();
+
         function loadReport() {
             const date = document.getElementById('dateFilter').value;
             const body = document.getElementById('body');
@@ -5,32 +44,37 @@
 
             db.collection("attendance").get().then((snap) => {
                 body.innerHTML = "";
-                if (snap.empty) {
-                    body.innerHTML = "<tr><td colspan='3'>قاعدة البيانات فارغة تماماً!</td></tr>";
-                    return;
-                }
-                
                 let found = false;
+                
                 snap.forEach((doc) => {
-                    // لنطبع في الجدول كل معرفات الوثائق لنرى صيغتها
-                    body.innerHTML += `<tr><td colspan='3' style='color:red; font-size:10px;'>ID الموجود: ${doc.id}</td></tr>`;
-                    
+                    // التحقق من أن التاريخ يبدأ بنفس التنسيق
                     if(doc.id.startsWith(date)) {
                         found = true;
                         const data = doc.data().data;
-                        const parts = doc.id.split('_');
+                        const parts = doc.id.split('_'); // [التاريخ, الصف, الشعبة, الدرس]
+                        
                         for(let sId in data) {
                             if(data[sId] !== "حاضر") {
-                                body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${data[sId]}</td></tr>`;
+                                // إضافة البيانات للجدول بشكل صحيح
+                                body.innerHTML += `<tr>
+                                    <td>${sId}</td>
+                                    <td>${parts[1]}</td>
+                                    <td>${parts[3]} - ${data[sId]}</td>
+                                </tr>`;
                             }
                         }
                     }
                 });
-                
+
                 if(!found) {
-                    body.innerHTML += "<tr><td colspan='3'>لا توجد تطابقات للتاريخ المحدد!</td></tr>";
+                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات مسجلة لهذا التاريخ!</td></tr>";
                 }
             }).catch(err => {
                 body.innerHTML = "<tr><td colspan='3'>خطأ: " + err.message + "</td></tr>";
             });
         }
+        
+        loadReport();
+    </script>
+</body>
+</html>

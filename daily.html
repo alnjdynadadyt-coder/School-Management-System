@@ -19,13 +19,7 @@
         <h3>تقرير الغيابات اليومي</h3>
         <input type="date" id="dateFilter" onchange="loadReport()">
         <table>
-            <thead>
-                <tr>
-                    <th>الاسم</th>
-                    <th>الصف</th>
-                    <th>التفاصيل</th>
-                </tr>
-            </thead>
+            <thead><tr><th>اسم الطالب</th><th>الشعبة</th><th>التفاصيل</th></tr></thead>
             <tbody id="body"></tbody>
         </table>
     </div>
@@ -40,40 +34,51 @@
         function loadReport() {
             const date = document.getElementById('dateFilter').value;
             const body = document.getElementById('body');
-            body.innerHTML = "جاري الفحص...";
+            body.innerHTML = "جاري التحميل...";
 
-            db.collection("attendance").get().then((snap) => {
-                body.innerHTML = "";
-                let found = false;
+            // جلب الطلاب ثم الحضور
+            Promise.all([
+                db.collection("students").get(),
+                db.collection("attendance").get()
+            ]).then(([studentsSnap, attendSnap]) => {
+                const students = {};
+                studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
                 
-                snap.forEach((doc) => {
-                    // التحقق من أن التاريخ يبدأ بنفس التنسيق
+                const reportData = {};
+                attendSnap.forEach((doc) => {
                     if(doc.id.startsWith(date)) {
-                        found = true;
                         const data = doc.data().data;
-                        const parts = doc.id.split('_'); // [التاريخ, الصف, الشعبة, الدرس]
-                        
+                        const parts = doc.id.split('_');
+                        const section = parts[2];
+                        const lesson = parts[3].replace("الدرس ", "");
+
                         for(let sId in data) {
                             if(data[sId] !== "حاضر") {
-                                // إضافة البيانات للجدول بشكل صحيح
-                                body.innerHTML += `<tr>
-                                    <td>${sId}</td>
-                                    <td>${parts[1]}</td>
-                                    <td>${parts[3]} - ${data[sId]}</td>
-                                </tr>`;
+                                if(!reportData[sId]) {
+                                    reportData[sId] = { name: students[sId] || sId, section: section, absences: [] };
+                                }
+                                reportData[sId].absences.push(`${lesson} ${data[sId]}`);
                             }
                         }
                     }
                 });
 
-                if(!found) {
-                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات مسجلة لهذا التاريخ!</td></tr>";
+                body.innerHTML = "";
+                const ids = Object.keys(reportData);
+                if(ids.length === 0) {
+                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات مسجلة لهذا التاريخ</td></tr>";
+                } else {
+                    ids.forEach(id => {
+                        let s = reportData[id];
+                        body.innerHTML += `<tr>
+                            <td>${s.name}</td>
+                            <td>${s.section}</td>
+                            <td>${s.absences.join(' | ')}</td>
+                        </tr>`;
+                    });
                 }
-            }).catch(err => {
-                body.innerHTML = "<tr><td colspan='3'>خطأ: " + err.message + "</td></tr>";
             });
         }
-        
         loadReport();
     </script>
 </body>

@@ -1,105 +1,36 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>التقرير اليومي</title>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
-        .header-actions { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        #backBtn { padding: 8px 16px; background: #6c757d; color: white; text-decoration: none; border-radius: 6px; }
-        h3 { text-align: center; color: #333; margin: 0; }
-        input[type="date"] { padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-        th { background: #4a90e2; color: white; padding: 12px; border: 1px solid #ddd; }
-        td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        .absent { color: #d9534f; font-weight: bold; }
-        .leave { color: #f0ad4e; font-weight: bold; }
-        .btn-print { background: #28a745; color: white; padding: 12px 30px; border: none; border-radius: 8px; width: 100%; font-size: 18px; cursor: pointer; margin-top: 20px; }
-        
-        @media print {
-            .btn-print, .header-actions { display: none !important; }
-            body { background: white; }
-            .container { box-shadow: none; width: 100%; }
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header-actions">
-            <a href="index.html" id="backBtn">⬅️ عودة</a>
-            <input type="date" id="dateFilter" onchange="loadReport()">
-        </div>
-        <h3 id="reportTitle">تقرير الغيابات اليومي</h3>
-        
-        <table>
-            <thead><tr><th>اسم الطالب</th><th>الشعبة</th><th>التفاصيل</th></tr></thead>
-            <tbody id="reportBody"></tbody>
-        </table>
-        <button class="btn-print" onclick="window.print()">🖨️ طباعة التقرير</button>
-    </div>
-
-    <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
-
-        document.getElementById('dateFilter').valueAsDate = new Date();
-
         function loadReport() {
             const date = document.getElementById('dateFilter').value;
-            const body = document.getElementById('reportBody');
-            const title = document.getElementById('reportTitle');
-            
-            const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
-            title.innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
-            body.innerHTML = "<tr><td colspan='3'>جاري جلب البيانات...</td></tr>";
+            const body = document.getElementById('body');
+            body.innerHTML = "جاري الفحص...";
 
-            Promise.all([
-                db.collection("students").get(),
-                db.collection("attendance").get()
-            ]).then(([studentsSnap, attendSnap]) => {
-                const students = {};
-                studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
+            db.collection("attendance").get().then((snap) => {
+                body.innerHTML = "";
+                if (snap.empty) {
+                    body.innerHTML = "<tr><td colspan='3'>قاعدة البيانات فارغة تماماً!</td></tr>";
+                    return;
+                }
                 
-                const reportData = {};
-
-                attendSnap.forEach((doc) => {
+                let found = false;
+                snap.forEach((doc) => {
+                    // لنطبع في الجدول كل معرفات الوثائق لنرى صيغتها
+                    body.innerHTML += `<tr><td colspan='3' style='color:red; font-size:10px;'>ID الموجود: ${doc.id}</td></tr>`;
+                    
                     if(doc.id.startsWith(date)) {
+                        found = true;
                         const data = doc.data().data;
                         const parts = doc.id.split('_');
-                        const section = parts[2];
-                        const lesson = parts[3].replace("الدرس ", "");
-
                         for(let sId in data) {
                             if(data[sId] !== "حاضر") {
-                                if(!reportData[sId]) {
-                                    reportData[sId] = { name: students[sId] || sId, section: section, absences: [] };
-                                }
-                                const statusClass = data[sId] === 'غائب' ? 'absent' : 'leave';
-                                reportData[sId].absences.push(`${lesson} <span class="${statusClass}">${data[sId]}</span>`);
+                                body.innerHTML += `<tr><td>${sId}</td><td>${parts[1]}</td><td>${data[sId]}</td></tr>`;
                             }
                         }
                     }
                 });
-
-                body.innerHTML = "";
-                const sortedIds = Object.keys(reportData).sort((a, b) => reportData[a].name.localeCompare(reportData[b].name));
                 
-                if(sortedIds.length === 0) {
-                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات مسجلة لهذا اليوم</td></tr>";
-                } else {
-                    sortedIds.forEach(id => {
-                        let s = reportData[id];
-                        body.innerHTML += `<tr><td>${s.name}</td><td>${s.section}</td><td>${s.absences.join(' | ')}</td></tr>`;
-                    });
+                if(!found) {
+                    body.innerHTML += "<tr><td colspan='3'>لا توجد تطابقات للتاريخ المحدد!</td></tr>";
                 }
+            }).catch(err => {
+                body.innerHTML = "<tr><td colspan='3'>خطأ: " + err.message + "</td></tr>";
             });
         }
-        
-        loadReport();
-    </script>
-</body>
-</html>

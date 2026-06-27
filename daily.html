@@ -2,88 +2,81 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <title>التقرير اليومي المجمع</title>
+    <title>التقرير اليومي</title>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; padding: 20px; }
-        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; padding: 20px; }
+        .container { max-width: 850px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
         h3 { text-align: center; color: #333; }
-        .controls { display: flex; justify-content: center; margin-bottom: 20px; }
-        input[type="date"] { padding: 10px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border: 1px solid #dee2e6; padding: 12px; text-align: center; }
-        th { background: #343a40; color: white; }
-        tr:nth-child(even) { background: #f2f2f2; }
+        .controls { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; }
+        #backBtn { padding: 10px 20px; background: #6c757d; color: white; text-decoration: none; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: #4a90e2; color: white; padding: 12px; }
+        td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        .absent { color: #d9534f; font-weight: bold; background: #fff5f5; }
+        .leave { color: #f0ad4e; font-weight: bold; background: #fffcf0; }
         .btn-print { background: #28a745; color: white; padding: 12px 30px; border: none; border-radius: 8px; width: 100%; font-size: 18px; cursor: pointer; margin-top: 20px; }
-        @media print { .btn-print, .controls { display: none; } body { background: white; } .container { box-shadow: none; } }
+        
+        @media print {
+            .btn-print, .controls, #backBtn { display: none !important; }
+            .container { box-shadow: none; width: 100%; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h3>تقرير الغيابات والإجازات اليومي</h3>
+        <a href="index.html" id="backBtn">⬅️ العودة</a>
+        <h3 id="reportTitle">تقرير الغيابات اليومي</h3>
         <div class="controls">
             <input type="date" id="dateFilter" onchange="loadReport()">
         </div>
         <table>
-            <thead><tr><th>الصف/الشعبة</th><th>اسم الطالب</th><th>تفاصيل الغياب/الإجازة</th></tr></thead>
+            <thead><tr><th>اسم الطالب</th><th>الصف/الشعبة</th><th>التفاصيل</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
         <button class="btn-print" onclick="window.print()">🖨️ طباعة التقرير</button>
     </div>
 
     <script>
-        const firebaseConfig = { apiKey: "AIzaSyAu6Lmi46t0eoympoDmHQ9UkMlSCVxxfr8", projectId: "school-manager-d1865" };
-        if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
-
         document.getElementById('dateFilter').valueAsDate = new Date();
 
         async function loadReport() {
             const date = document.getElementById('dateFilter').value;
+            const dayName = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"][new Date(date).getDay()];
+            document.getElementById('reportTitle').innerText = `تقرير الغيابات ليوم ${dayName} (${date})`;
+            
             const body = document.getElementById('reportBody');
-            body.innerHTML = "<tr><td colspan='3'>جاري جلب البيانات...</td></tr>";
+            body.innerHTML = "<tr><td colspan='3'>جاري التحميل...</td></tr>";
 
-            try {
-                const snapshot = await db.collection("attendance").get();
-                // جلب قائمة الطلاب لترجمة الـ ID إلى اسم
-                const studentsSnap = await db.collection("students").get();
-                const students = {};
-                studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
+            const snapshot = await db.collection("attendance").get();
+            const studentsSnap = await db.collection("students").get();
+            const students = {};
+            studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
 
-                let reportData = {};
-
-                snapshot.forEach(doc => {
-                    if(doc.id.startsWith(date)) {
-                        const data = doc.data().data;
-                        const parts = doc.id.split('_'); 
-                        const classSection = `${parts[1]} - ${parts[2]}`;
-
-                        for(let studentId in data) {
-                            if(data[studentId] !== "حاضر") {
-                                if(!reportData[studentId]) {
-                                    reportData[studentId] = { name: students[studentId] || studentId, class: classSection, absences: [] };
-                                }
-                                reportData[studentId].absences.push(`${parts[3]} (${data[studentId]})`);
-                            }
+            let reportData = {};
+            snapshot.forEach(doc => {
+                if(doc.id.startsWith(date)) {
+                    const data = doc.data().data;
+                    const parts = doc.id.split('_'); 
+                    for(let sId in data) {
+                        if(data[sId] !== "حاضر") {
+                            if(!reportData[sId]) reportData[sId] = { name: students[sId] || sId, class: `${parts[1]} - ${parts[2]}`, absences: [] };
+                            // اختصار اسم الدرس: "الدرس الأول" -> "الأول"
+                            let lessonShort = parts[3].replace("الدرس ", "");
+                            reportData[sId].absences.push(`${lessonShort} <span class="${data[sId] === 'غائب' ? 'absent' : 'leave'}">${data[sId]}</span>`);
                         }
                     }
-                });
-
-                body.innerHTML = "";
-                const sortedKeys = Object.keys(reportData).sort();
-                
-                if(sortedKeys.length === 0) {
-                    body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات لهذا اليوم</td></tr>";
-                } else {
-                    sortedKeys.forEach(id => {
-                        let s = reportData[id];
-                        body.innerHTML += `<tr><td>${s.class}</td><td>${s.name}</td><td>${s.absences.join(' | ')}</td></tr>`;
-                    });
                 }
-            } catch(e) {
-                body.innerHTML = "<tr><td colspan='3'>خطأ في تحميل البيانات</td></tr>";
-            }
+            });
+
+            body.innerHTML = "";
+            Object.keys(reportData).sort().forEach(id => {
+                let s = reportData[id];
+                body.innerHTML += `<tr><td>${s.name}</td><td>${s.class}</td><td>${s.absences.join(' | ')}</td></tr>`;
+            });
+            if(Object.keys(reportData).length === 0) body.innerHTML = "<tr><td colspan='3'>لا توجد غيابات لهذا اليوم</td></tr>";
         }
         loadReport();
     </script>

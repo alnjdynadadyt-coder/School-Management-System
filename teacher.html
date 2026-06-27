@@ -23,7 +23,6 @@
             .print-only { display: block !important; }
             body { background: white; }
             .container { box-shadow: none; width: 100%; }
-            /* إخفاء الصفوف التي تحتوي على "حاضر" فقط عند الطباعة */
             tr.is-present { display: none; }
         }
     </style>
@@ -123,7 +122,9 @@
             const data = {};
             document.querySelectorAll('.status-btn').forEach(btn => data[btn.getAttribute('data-id')] = btn.innerText);
             db.collection("attendance").doc(docId).set({ data, teacher: teacherName.value, subject: subjectSelect.value, notes: notes.value }).then(() => {
-                alert("✅ تم الحفظ بنجاح! يمكنك الآن طباعة التقرير.");
+                alert("✅ تم الحفظ بنجاح!");
+                // بدلاً من reload، نستدعي loadStudents لتحديث الواجهة للحالة الجديدة
+                loadStudents();
             });
         };
     </script>

@@ -13,14 +13,13 @@
         select, input, button { padding: 12px; border-radius: 8px; border: 1px solid #ccc; width: 100%; box-sizing: border-box; }
         .back-btn { display: inline-block; background: #6c757d; color: white; padding: 8px 15px; border-radius: 8px; text-decoration: none; margin-bottom: 15px; }
         
-        /* إخفاء الأزرار عند الطباعة/PDF */
+        /* إخفاء الأزرار عند التصدير */
         @media print { .no-print { display: none !important; } }
 
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
         th, td { border: 1px solid #ddd; padding: 12px; text-align: center; }
         th { background: #6f42c1; color: white; }
 
-        /* الألوان المطلوبة */
         .status-absent { color: red; font-weight: bold; }
         .status-leave { color: orange; font-weight: bold; }
         .summary-total { color: red; font-weight: bold; }
@@ -41,7 +40,7 @@
         </div>
         <div id="summary" style="margin-bottom: 15px; font-weight: bold; color: #6f42c1;"></div>
         <table>
-            <thead><tr><th>التاريخ</th><th>الدروس</th><th>الحالة</th></tr></thead>
+            <thead><tr><th>التاريخ</th><th>الدرس</th><th>الحالة</th></tr></thead>
             <tbody id="reportBody"></tbody>
         </table>
     </div>
@@ -62,7 +61,6 @@
             const c = document.getElementById('classSelect').value;
             const secSelect = document.getElementById('sectionSelect');
             secSelect.innerHTML = '<option value="">اختر الشعبة</option>';
-            if(!c) return;
             db.collection("students").where("class", "==", c).get().then(snap => {
                 let sections = new Set();
                 snap.forEach(doc => { if(doc.data().section) sections.add(doc.data().section); });
@@ -75,7 +73,6 @@
             const s = document.getElementById('sectionSelect').value;
             const stuSelect = document.getElementById('studentSelect');
             stuSelect.innerHTML = '<option value="">اختر الطالب</option>';
-            if(!c || !s) return;
             db.collection("students").where("class", "==", c).where("section", "==", s).get().then(snap => {
                 snap.forEach(doc => stuSelect.innerHTML += `<option value="${doc.id}">${doc.data().name}</option>`);
             });
@@ -89,7 +86,7 @@
             
             document.getElementById('reportBody').innerHTML = "جاري جلب البيانات...";
             const attendSnap = await db.collection("attendance").get();
-            let abs = 0, leave = 0, grouped = {};
+            let abs = 0, leave = 0, rows = [];
             
             attendSnap.forEach(doc => {
                 const parts = doc.id.split('_');
@@ -97,18 +94,23 @@
                 if(docDate >= dFrom && docDate <= dTo) {
                     const data = doc.data().data || {};
                     if(data[sId] && data[sId] !== "حاضر") {
-                        if(!grouped[docDate]) grouped[docDate] = {lessons: [], status: data[sId]};
-                        grouped[docDate].lessons.push(parts[3] || 'غير محدد');
+                        // كل درس يُعامل كصف مستقل لضمان دقة البيانات
+                        rows.push({
+                            date: docDate, 
+                            lesson: parts[3] || 'درس غير محدد', 
+                            status: data[sId]
+                        });
                         if(data[sId] === "غائب") abs++; 
                         if(data[sId] === "مجاز") leave++;
                     }
                 }
             });
 
+            rows.sort((a, b) => a.date.localeCompare(b.date));
             let html = "";
-            Object.keys(grouped).sort().forEach(date => {
-                const statusClass = grouped[date].status === "غائب" ? "status-absent" : "status-leave";
-                html += `<tr><td>${date}</td><td>${grouped[date].lessons.join('، ')}</td><td class="${statusClass}">${grouped[date].status}</td></tr>`;
+            rows.forEach(r => {
+                const statusClass = r.status === "غائب" ? "status-absent" : "status-leave";
+                html += `<tr><td>${r.date}</td><td>${r.lesson}</td><td class="${statusClass}">${r.status}</td></tr>`;
             });
             
             document.getElementById('reportBody').innerHTML = html || "<tr><td colspan='3'>لا توجد سجلات</td></tr>";
@@ -116,8 +118,16 @@
         }
 
         function exportPDF() {
+            // نحدد العنصر المراد طباعته
             const element = document.querySelector('.container');
-            html2pdf().from(element).save('تقرير_الطالب.pdf');
+            const opt = {
+                margin: 5,
+                filename: 'تقرير_الطالب.pdf',
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
         }
     </script>
 </body>

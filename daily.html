@@ -60,6 +60,61 @@
             });
         }
         loadReport();
+        <script>
+    // ... (نفس الإعدادات السابقة لـ firebaseConfig و db) ...
+
+    function loadReport() {
+        const date = document.getElementById('dateFilter').value;
+        const body = document.getElementById('body');
+        body.innerHTML = "جاري التحميل...";
+
+        Promise.all([
+            db.collection("students").get(),
+            db.collection("attendance").get()
+        ]).then(([studentsSnap, attendSnap]) => {
+            const students = {};
+            studentsSnap.forEach(doc => students[doc.id] = doc.data().name);
+            
+            const reportData = {};
+
+            attendSnap.forEach((doc) => {
+                if(doc.id.startsWith(date)) {
+                    const data = doc.data().data; // بيانات الغياب
+                    const parts = doc.id.split('_'); // [التاريخ, الصف, الشعبة, الدرس]
+                    const className = parts[1];
+                    const sectionName = parts[2]; // الشعبة
+                    const lesson = parts[3].replace("الدرس ", ""); // اختصار "الدرس الأول" إلى "الأول"
+
+                    for(let sId in data) {
+                        if(data[sId] !== "حاضر") {
+                            if(!reportData[sId]) {
+                                reportData[sId] = { 
+                                    name: students[sId] || sId, 
+                                    section: sectionName, 
+                                    absences: [] 
+                                };
+                            }
+                            // تجميع الحالة: (الأول غائب)
+                            reportData[sId].absences.push(`${lesson} ${data[sId]}`);
+                        }
+                    }
+                }
+            });
+
+            body.innerHTML = "";
+            for(let id in reportData) {
+                let s = reportData[id];
+                body.innerHTML += `<tr>
+                    <td>${s.name}</td>
+                    <td>${s.section}</td>
+                    <td>${s.absences.join(' | ')}</td>
+                </tr>`;
+            }
+        });
+    }
+    loadReport();
+</script>
+
     </script>
 </body>
 </html>
